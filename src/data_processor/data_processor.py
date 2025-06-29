@@ -62,6 +62,63 @@ class DataProcessor:
         
         self.default_currency = default_currency
     
+    def process_invoice_record(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Обработка записи Smart Invoice для workflow.
+        
+        Args:
+            raw_data: Сырые данные счёта из Smart Invoices API
+            
+        Returns:
+            Dict[str, Any]: Обработанные данные в формате для Excel
+        """
+        try:
+            # Извлекаем данные из Smart Invoice структуры
+            return {
+                'account_number': raw_data.get('accountNumber', ''),
+                'inn': self._extract_smart_invoice_inn(raw_data),
+                'counterparty': self._extract_smart_invoice_counterparty(raw_data),
+                'amount': self._format_amount(raw_data.get('opportunity', 0)),
+                'vat_amount': self._format_amount(raw_data.get('taxValue', 0)),
+                'vat_text': 'нет' if float(raw_data.get('taxValue', 0)) == 0 else self._format_amount(raw_data.get('taxValue', 0)),
+                'invoice_date': self._format_date(raw_data.get('begindate')),
+                'shipping_date': self._format_date(raw_data.get('UFCRM_SMART_INVOICE_1651168135187')),
+                'payment_date': self._format_date(raw_data.get('UFCRM_626D6ABE98692')),
+                'is_unpaid': not bool(raw_data.get('UFCRM_626D6ABE98692')),  # нет даты оплаты = неоплачен
+                'stage_id': raw_data.get('stageId', '')
+            }
+        except Exception as e:
+            logger.error(f"Ошибка обработки Smart Invoice: {e}")
+            return None
+    
+    def _extract_smart_invoice_inn(self, raw_data: Dict[str, Any]) -> str:
+        """Извлечение ИНН для Smart Invoice (будет дополнено через реквизиты)"""
+        # Пока возвращаем пустую строку, ИНН будет получен через реквизиты
+        return ""
+    
+    def _extract_smart_invoice_counterparty(self, raw_data: Dict[str, Any]) -> str:
+        """Извлечение названия контрагента для Smart Invoice"""
+        # Пока возвращаем пустую строку, название будет получено через реквизиты
+        return ""
+    
+    def _format_amount(self, amount) -> str:
+        """Форматирование суммы"""
+        try:
+            return f"{float(amount):,.2f}".replace(',', ' ').replace('.', ',')
+        except:
+            return "0,00"
+    
+    def _format_date(self, date_str) -> str:
+        """Форматирование даты"""
+        if not date_str:
+            return ""
+        try:
+            from datetime import datetime
+            d = datetime.fromisoformat(date_str.replace('Z', '+00:00')).date()
+            return d.strftime("%d.%m.%Y")
+        except:
+            return ""
+
     def process_invoice_data(self, raw_data: Dict[str, Any]) -> InvoiceData:
         """
         Обработка данных одного счёта.

@@ -32,6 +32,154 @@ class ExcelReportGenerator:
         self.summary_formatter = ExcelSummaryFormatter()
         self.validator = DataValidator()
     
+    def create_report(self, data: List[Dict[str, Any]], output_path: str) -> str:
+        """
+        Создает Excel отчет в стиле ShortReport.py с правильной структурой данных.
+        
+        Args:
+            data: Список обработанных данных счетов
+            output_path: Путь для сохранения файла
+            
+        Returns:
+            Путь к созданному файлу
+        """
+        from openpyxl import Workbook
+        from openpyxl.styles import PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+        
+        # Создаём новую книгу
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Счета (Smart Invoices)"
+
+        # Заголовки (точно как в ShortReport.py)
+        headers = ["Номер", "ИНН", "Контрагент", "Сумма", "НДС", "Дата счёта", "Дата отгрузки", "Дата оплаты"]
+        ws.append(headers)
+
+        # Заливки для строк (правильные цвета как в ShortReport.py)
+        white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+        grey_fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
+        red_fill = PatternFill(start_color="FFC0CB", end_color="FFC0CB", fill_type="solid")
+
+        row_index = 2  # т.к. первая строка занята заголовками
+        total_amount = 0.0
+        total_vat = 0.0
+        
+        for record in data:
+            # Получаем данные строки и метаинформацию
+            row_data = record.get('data', [])
+            is_unpaid = record.get('is_unpaid', False)
+            is_no_vat = record.get('is_no_vat', False)
+            amount = record.get('amount', 0)
+            vat_amount = record.get('vat_amount', 0)
+            
+            # Добавляем строку данных
+            ws.append(row_data)
+            
+            # Подсчет итогов
+            total_amount += amount
+            total_vat += vat_amount
+
+            # Логика заливки (точно как в ShortReport.py):
+            # если нет даты оплаты => красная строка
+            # иначе, если НДС="нет" => серая строка
+            # иначе белая
+            if is_unpaid:
+                fill_color = red_fill
+            elif is_no_vat:
+                fill_color = grey_fill
+            else:
+                fill_color = white_fill
+
+            for col_idx in range(1, len(headers) + 1):
+                cell = ws.cell(row=row_index, column=col_idx)
+                cell.fill = fill_color
+
+            row_index += 1
+
+        # Автоподбор ширины столбцов (как в ShortReport.py)
+        for col in ws.columns:
+            max_length = 0
+            col_letter = get_column_letter(col[0].column)
+            for cell in col:
+                val = cell.value
+                if val is not None:
+                    length = len(str(val))
+                    if length > max_length:
+                        max_length = length
+            ws.column_dimensions[col_letter].width = max_length + 2
+
+        # Выравнивания (как в ShortReport.py)
+        center_alignment = Alignment(horizontal="center")
+        left_alignment = Alignment(horizontal="left")
+        right_alignment = Alignment(horizontal="right")
+
+        # Заголовок (первая строка) выравниваем по центру и задаём правильный цвет (ОРАНЖЕВЫЙ!)
+        header_fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
+
+        for cell in ws["1:1"]:
+            cell.alignment = center_alignment
+            cell.fill = header_fill
+
+        # Центрирование столбцов B, E (ИНН, НДС)
+        for cell in ws["B:B"]:
+            cell.alignment = center_alignment
+        for cell in ws["E:E"]:
+            cell.alignment = center_alignment
+
+        # Выравнивание вправо для дат F, G, H
+        for cell in ws["F:F"]:
+            cell.alignment = right_alignment
+        for cell in ws["G:G"]:
+            cell.alignment = right_alignment
+        for cell in ws["H:H"]:
+            cell.alignment = right_alignment
+
+        # Для столбца D (Контрагент) — сдвиг влево, но только со второй строки
+        for cell in ws["C:C"]:
+            if cell.row > 1:
+                cell.alignment = left_alignment
+
+        # Добавляем тонкие границы для всех ячеек
+        thin = Side(style='thin')
+        thin_border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        for row in ws.iter_rows():
+            for cell in row:
+                cell.border = thin_border
+
+        # Добавляем итоги внизу (как на скриншоте 04.png)
+        summary_start_row = row_index + 1
+        
+        # Форматирование итоговых сумм как в ShortReport.py
+        def format_currency(amount):
+            return f"{amount:,.2f}".replace(',', ' ').replace('.', ',')
+        
+        # Добавляем строку итогов
+        summary_data = [
+            "ИТОГО:",
+            "",  # ИНН пустой
+            f"Записей: {len(data)}",
+            format_currency(total_amount),
+            format_currency(total_vat) if total_vat > 0 else "нет",
+            "", "", ""  # Даты пустые
+        ]
+        
+        ws.append(summary_data)
+        
+        # Выделяем итоговую строку жирным
+        from openpyxl.styles import Font
+        bold_font = Font(bold=True)
+        for col_idx in range(1, len(headers) + 1):
+            cell = ws.cell(row=summary_start_row, column=col_idx)
+            cell.font = bold_font
+            cell.fill = PatternFill(start_color="E6E6E6", end_color="E6E6E6", fill_type="solid")
+
+        # Сохраняем файл
+        wb.save(output_path)
+        
+        return output_path
+    
     def generate_report(self, data: List[Dict[str, Any]], 
                        output_path: str, 
                        sheet_name: str = "Отчёт") -> str:

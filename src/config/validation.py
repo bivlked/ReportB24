@@ -258,13 +258,11 @@ class NetworkValidator:
         
         try:
             # Пробуем простой метод для проверки доступности API
-            test_method = webhook_url + "user.current"
+            test_method = webhook_url + "profile"
             
-            response = requests.post(
+            response = requests.get(
                 test_method,
-                json={},
-                timeout=timeout,
-                headers={'Content-Type': 'application/json'}
+                timeout=timeout
             )
             
             if response.status_code == 200:

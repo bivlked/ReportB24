@@ -307,7 +307,8 @@ class Bitrix24Client:
     def get_smart_invoices(
         self,
         entity_type_id: int = 31,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
+        select: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """
         Получение всех Smart Invoices с автоматической пагинацией.
@@ -332,6 +333,9 @@ class Bitrix24Client:
             
             if filters:
                 params['filter'] = filters
+            
+            if select:
+                params['select'] = select
             
             response = self._make_request('POST', 'crm.item.list', data=params)
             
@@ -358,6 +362,100 @@ class Bitrix24Client:
             self.session.close()
             logger.info("Bitrix24 client closed")
     
+    def get_requisite_links(self, entity_type_id: int, entity_id: int) -> List[Dict[str, Any]]:
+        """
+        Получение связей реквизитов для сущности (как в ShortReport.py)
+        
+        Args:
+            entity_type_id: Тип сущности (31 для Smart Invoices)
+            entity_id: ID сущности
+            
+        Returns:
+            List[Dict]: Список связей реквизитов
+        """
+        params = {
+            'filter[ENTITY_TYPE_ID]': entity_type_id,
+            'filter[ENTITY_ID]': entity_id
+        }
+        
+        response = self._make_request('GET', 'crm.requisite.link.list', params=params)
+        return response.data if response.data else []
+    
+    def get_requisite_details(self, requisite_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Получение деталей реквизита (как в ShortReport.py)
+        
+        Args:
+            requisite_id: ID реквизита
+            
+        Returns:
+            Dict: Детали реквизита или None
+        """
+        data = {"id": str(requisite_id)}
+        
+        response = self._make_request('POST', 'crm.requisite.get', data=data)
+        return response.data if response.data else None
+    
+    def get_company_info_by_invoice(self, invoice_number: str) -> tuple:
+        """
+        Получение информации о компании по номеру счета (точная копия из ShortReport.py)
+        
+        Args:
+            invoice_number: Номер счета
+            
+        Returns:
+            tuple: (название_компании, ИНН)
+        """
+        try:
+            # 1. Ищем счёт по номеру (accountNumber)
+            params = {
+                'filter[accountNumber]': invoice_number,
+                'entityTypeId': 31
+            }
+            
+            response = self._make_request('GET', 'crm.item.list', params=params)
+            
+            if not response.data or not response.data.get('items'):
+                return None, None
+            
+            items = response.data.get('items', [])
+            inv_id = items[0].get('id')
+            if not inv_id:
+                return None, None
+            
+            # 2. Ищем привязку в crm.requisite.link
+            requisite_links = self.get_requisite_links(31, inv_id)
+            if not requisite_links:
+                return "Нет реквизитов", "Нет реквизитов"
+            
+            req_id = requisite_links[0].get('REQUISITE_ID')
+            if not req_id or int(req_id) <= 0:
+                return "Некорректный реквизит", "Некорректный реквизит"
+            
+            # 3. Получаем реквизит
+            requisite_details = self.get_requisite_details(int(req_id))
+            if not requisite_details:
+                return "Ошибка реквизита", "Ошибка реквизита"
+            
+            rq_inn = requisite_details.get('RQ_INN', '')
+            rq_company = requisite_details.get('RQ_COMPANY_NAME', '')
+            rq_name = requisite_details.get('RQ_NAME', '')
+            
+            # 4. Логика определения типа по ИНН (как в ShortReport.py)
+            if rq_inn.isdigit():
+                if len(rq_inn) == 10:
+                    return rq_company, rq_inn  # ООО/ЗАО
+                elif len(rq_inn) == 12:
+                    return (f"ИП {rq_name}" if rq_name else "ИП (нет имени)", rq_inn)  # ИП
+                else:
+                    return rq_company, rq_inn
+            else:
+                return rq_company, rq_inn
+                
+        except Exception as e:
+            logger.error(f"Ошибка получения реквизитов для {invoice_number}: {e}")
+            return "Ошибка", "Ошибка"
+
     def get_stats(self) -> Dict[str, Any]:
         """Получение статистики работы клиента"""
         return {

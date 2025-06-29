@@ -234,7 +234,7 @@ class WorkflowOrchestrator:
     
     def _fetch_invoices_data(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """
-        Получает данные счетов из Bitrix24.
+        Получает данные счетов из Bitrix24 (как в ShortReport.py).
         
         Args:
             start_date: Дата начала периода (дд.мм.гггг)
@@ -244,117 +244,162 @@ class WorkflowOrchestrator:
             List: Список данных счетов
         """
         try:
-            # Параметры фильтрации
+            from datetime import datetime
+            
+            # Конвертируем даты в объекты date
+            start_date_obj = datetime.strptime(start_date, "%d.%m.%Y").date()
+            end_date_obj = datetime.strptime(end_date, "%d.%m.%Y").date()
+            
+            self.logger.info(f"Получение Smart Invoices за период: {start_date_obj} - {end_date_obj}")
+            
+            # Получаем все Smart Invoices (как в ShortReport.py)
             filter_params = {
-                ">=UF_CRM_SHIPPING_DATE": start_date,
-                "<=UF_CRM_SHIPPING_DATE": end_date
+                "!stageId": "DT31_1:D"  # исключаем удаленные
             }
             
-            # Поля для выборки
+            # Поля для выборки (точно как в ShortReport.py)
             select_fields = [
-                "ID",
-                "ACCOUNT_NUMBER",
-                "OPPORTUNITY", 
-                "CURRENCY_ID",
-                "UF_CRM_SHIPPING_DATE",
-                "UF_CRM_INN",
-                "UF_CRM_COMPANY_NAME",
-                "UF_CRM_VAT_RATE",
-                "UF_CRM_VAT_AMOUNT"
+                'id',
+                'accountNumber',
+                'statusId',
+                'dateBill',
+                'price',
+                'UFCRM_SMART_INVOICE_1651168135187',  # Дата отгрузки
+                'UFCRM_626D6ABE98692',               # Дата оплаты
+                'begindate',
+                'opportunity',
+                'stageId',
+                'taxValue'
             ]
             
-            self.logger.info(f"Запрос счетов с {start_date} по {end_date}")
-            
-            # Получение Smart Invoices 
-            invoices = self.bitrix_client.get_smart_invoices(
+            # Получение всех Smart Invoices 
+            all_invoices = self.bitrix_client.get_smart_invoices(
                 entity_type_id=31,
-                filters=filter_params
+                filters=filter_params,
+                select=select_fields
             )
             
-            # Обогащение данными реквизитов
-            enriched_invoices = self._enrich_with_requisites(invoices)
+            self.logger.info(f"Получено {len(all_invoices)} счетов всего")
             
+            # Фильтрация по дате отгрузки после получения (как в ShortReport.py)
+            filtered_invoices = []
+            for inv in all_invoices:
+                ship_date_str = inv.get('UFCRM_SMART_INVOICE_1651168135187')
+                if ship_date_str:
+                    try:
+                        d = datetime.fromisoformat(ship_date_str.replace('Z', '+00:00')).date()
+                        if start_date_obj <= d <= end_date_obj:
+                            filtered_invoices.append(inv)
+                    except ValueError as ex:
+                        self.logger.warning(f"Ошибка преобразования даты отгрузки (ID={inv.get('id')}): {ex}")
+            
+            self.logger.info(f"Отфильтровано {len(filtered_invoices)} счетов по дате отгрузки")
+            
+            # Обогащение данными реквизитов (как в ShortReport.py)
+            enriched_invoices = []
+            for invoice in filtered_invoices:
+                try:
+                    acc_num = invoice.get('accountNumber', '')
+                    
+                    # Получаем реквизиты компании
+                    comp_name, inn = self.bitrix_client.get_company_info_by_invoice(acc_num)
+                    if not comp_name and not inn:
+                        comp_name, inn = "Не найдено", "Не найдено"
+                    
+                    # Добавляем реквизиты к данным счета
+                    enriched_invoice = invoice.copy()
+                    enriched_invoice.update({
+                        'company_name': comp_name,
+                        'company_inn': inn
+                    })
+                    
+                    enriched_invoices.append(enriched_invoice)
+                    
+                except Exception as exp:
+                    self.logger.error(f"Ошибка обогащения счёта {invoice.get('id', 'N/A')}: {exp}")
+                    # Добавляем без реквизитов
+                    enriched_invoice = invoice.copy()
+                    enriched_invoice.update({
+                        'company_name': "Ошибка",
+                        'company_inn': "Ошибка"
+                    })
+                    enriched_invoices.append(enriched_invoice)
+            
+            self.logger.info(f"Итого обработано {len(enriched_invoices)} счетов с реквизитами")
             return enriched_invoices
             
         except Exception as e:
             handle_error(e, "_fetch_invoices_data", "WorkflowOrchestrator")
             raise
     
-    def _enrich_with_requisites(self, invoices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Обогащает данные счетов информацией из реквизитов.
-        
-        Args:
-            invoices: Список счетов
-            
-        Returns:
-            List: Обогащённый список счетов
-        """
-        enriched = []
-        
-        for invoice in invoices:
-            try:
-                # Копируем базовые данные
-                enriched_invoice = invoice.copy()
-                
-                # Получаем связи с реквизитами
-                if 'ID' in invoice:
-                    requisite_links = self.bitrix_client.get_requisite_links(
-                        entity_type_id=BitrixAPISettings.SMART_INVOICE_ENTITY_TYPE_ID,
-                        entity_id=invoice['ID']
-                    )
-                    
-                    # Получаем детали первого реквизита
-                    if requisite_links:
-                        first_link = requisite_links[0]
-                        if 'REQUISITE_ID' in first_link:
-                            requisite_details = self.bitrix_client.get_requisite_details(
-                                first_link['REQUISITE_ID']
-                            )
-                            
-                            # Добавляем данные реквизитов
-                            if requisite_details:
-                                enriched_invoice.update({
-                                    'REQUISITE_NAME': requisite_details.get('NAME', ''),
-                                    'REQUISITE_INN': requisite_details.get('RQ_INN', ''),
-                                    'REQUISITE_KPP': requisite_details.get('RQ_KPP', ''),
-                                    'REQUISITE_ACTIVE': requisite_details.get('ACTIVE', 'N')
-                                })
-                
-                enriched.append(enriched_invoice)
-                
-            except Exception as e:
-                # Логируем ошибку, но продолжаем обработку других счетов
-                self.logger.warning(f"Ошибка обогащения счёта {invoice.get('ID', 'unknown')}: {e}")
-                enriched.append(invoice)  # Добавляем без обогащения
-        
-        return enriched
+    def _format_amount(self, amount: float) -> str:
+        """Форматирует сумму как в ShortReport.py"""
+        return f"{amount:,.2f}".replace(',', ' ').replace('.', ',')
     
+    def _format_vat_amount(self, vat_amount: float) -> str:
+        """Форматирует НДС как в ShortReport.py"""
+        return self._format_amount(vat_amount) if vat_amount != 0 else "нет"
+    
+    def _format_date(self, date_str: str) -> str:
+        """Форматирует дату как в ShortReport.py"""
+        if not date_str:
+            return ""
+        try:
+            from datetime import datetime
+            d = datetime.fromisoformat(date_str.replace('Z', '+00:00')).date()
+            return d.strftime("%d.%m.%Y")
+        except:
+            return ""
+
     def _process_invoices_data(self, raw_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Обрабатывает сырые данные счетов.
+        Обрабатывает сырые данные счетов в формат для Excel (как в ShortReport.py).
         
         Args:
             raw_data: Сырые данные из Bitrix24
             
         Returns:
-            List: Обработанные данные
+            List: Обработанные данные для Excel
         """
         try:
             processed_records = []
             
             for record in raw_data:
                 try:
-                    # Обработка через DataProcessor
-                    processed_record = self.data_processor.process_invoice_record(record)
+                    # Формируем структуру данных для Excel (точно как в ShortReport.py)
+                    acc_num = record.get('accountNumber', '')
+                    sum_val = self._format_amount(float(record.get('opportunity', 0)))
+                    tax_val = float(record.get('taxValue', 0))
+                    tax_text = self._format_vat_amount(tax_val)
+
+                    date_bill_str = record.get('begindate')
+                    date_bill = self._format_date(date_bill_str)
+
+                    ship_date_str = record.get('UFCRM_SMART_INVOICE_1651168135187')
+                    ship_date = self._format_date(ship_date_str)
+
+                    pay_date_str = record.get('UFCRM_626D6ABE98692')
+                    pay_date = self._format_date(pay_date_str) if pay_date_str else ""
+
+                    comp_name = record.get('company_name', 'Не найдено')
+                    inn = record.get('company_inn', 'Не найдено')
+
+                    # Формируем данные строки Excel (массив значений в нужном порядке)
+                    row_data = [acc_num, inn, comp_name, sum_val, tax_text, date_bill, ship_date, pay_date]
                     
-                    if processed_record:
-                        processed_records.append(processed_record)
-                    else:
-                        self.logger.warning(f"Запись {record.get('ID', 'unknown')} не прошла валидацию")
+                    # Дополнительные флаги для стилизации
+                    processed_record = {
+                        'data': row_data,  # данные строки для Excel
+                        'is_unpaid': pay_date == "",  # нет даты оплаты = красная строка
+                        'is_no_vat': tax_text == "нет",  # нет НДС = серая строка
+                        'amount': float(record.get('opportunity', 0)),  # для расчета итогов
+                        'vat_amount': tax_val  # для расчета итогов НДС
+                    }
+                    
+                    processed_records.append(processed_record)
                         
                 except Exception as e:
-                    self.logger.warning(f"Ошибка обработки записи {record.get('ID', 'unknown')}: {e}")
+                    self.logger.warning(f"Ошибка обработки записи {record.get('id', 'unknown')}: {e}")
                     continue
             
             self.logger.info(f"Успешно обработано {len(processed_records)} из {len(raw_data)} записей")

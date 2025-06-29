@@ -1,10 +1,28 @@
 """
-Data Processing Module
-Модуль обработки и валидации данных
+Data Processor module для обработки данных отчёта.
+Координирует работу специализированных процессоров: INN, Date, Currency.
+"""
 
-Компоненты:
-- invoice_processor.py: обработка счетов
-- requisite_processor.py: обработка реквизитов  
-- date_utils.py: утилиты для дат
-- currency_utils.py: форматирование валют
-""" 
+from .inn_processor import INNProcessor, INNValidationResult
+from .date_processor import DateProcessor, DateProcessingResult
+from .currency_processor import CurrencyProcessor, CurrencyProcessingResult, VATCalculationResult
+from .data_processor import DataProcessor, InvoiceData
+
+__all__ = [
+    # Главный процессор
+    'DataProcessor',
+    'InvoiceData',
+    
+    # INN процессор
+    'INNProcessor',
+    'INNValidationResult',
+    
+    # Date процессор
+    'DateProcessor', 
+    'DateProcessingResult',
+    
+    # Currency процессор
+    'CurrencyProcessor',
+    'CurrencyProcessingResult',
+    'VATCalculationResult',
+] 

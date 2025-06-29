@@ -304,6 +304,54 @@ class Bitrix24Client:
         logger.info(f"Total invoices loaded: {len(all_invoices)}")
         return all_invoices
     
+    def get_smart_invoices(
+        self,
+        entity_type_id: int = 31,
+        filters: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Получение всех Smart Invoices с автоматической пагинацией.
+        
+        Args:
+            entity_type_id: ID типа сущности (31 для Smart Invoices)
+            filters: Фильтры для поиска
+            
+        Returns:
+            List[Dict]: Полный список Smart Invoices
+        """
+        all_invoices = []
+        start = 0
+        limit = 50
+        
+        while True:
+            params = {
+                'entityTypeId': entity_type_id,
+                'start': start,
+                'limit': limit
+            }
+            
+            if filters:
+                params['filter'] = filters
+            
+            response = self._make_request('POST', 'crm.item.list', data=params)
+            
+            if not response.data or not response.data.get('items'):
+                break
+            
+            items = response.data.get('items', [])
+            all_invoices.extend(items)
+            
+            # Проверяем есть ли еще данные
+            if response.next is None or len(items) < limit:
+                break
+            
+            start = response.next
+            
+            logger.debug(f"Loaded {len(all_invoices)} smart invoices so far")
+        
+        logger.info(f"Total smart invoices loaded: {len(all_invoices)}")
+        return all_invoices
+    
     def close(self):
         """Закрытие клиента и освобождение ресурсов"""
         if self.session:

@@ -267,9 +267,8 @@ class WorkflowOrchestrator:
             
             # Получение Smart Invoices 
             invoices = self.bitrix_client.get_smart_invoices(
-                entity_type_id=BitrixAPISettings.SMART_INVOICE_ENTITY_TYPE_ID,
-                filter_params=filter_params,
-                select_fields=select_fields
+                entity_type_id=31,
+                filters=filter_params
             )
             
             # Обогащение данными реквизитов

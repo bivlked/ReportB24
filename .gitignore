@@ -1,0 +1,60 @@
+# Виртуальное окружение
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyc
+*.pyo
+
+# Pytest и тестирование  
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.cache
+
+# IDE и редакторы
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Логи
+*.log
+logs/
+
+# Временные файлы
+*.tmp
+*.temp
+
+# Excel файлы (результаты работы программы)
+*.xlsx
+*.xls
+
+# Конфиденциальные данные
+.env
+*.key
+config_local.ini
+
+# OS файлы
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Документация билды
+docs/_build/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Дистрибутивы
+dist/
+build/
+*.egg-info/ 

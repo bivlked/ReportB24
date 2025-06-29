@@ -173,8 +173,8 @@ class ExcelReportGenerator:
             return
             
         # Вычисляем итоги
-        total_amount = sum(self._parse_amount(record.get('amount', '0')) for record in data)
-        total_vat = sum(self._parse_amount(record.get('vat_amount', '0')) for record in data)
+        total_amount = sum(record.get('amount_numeric', 0) or 0 for record in data)
+        total_vat = sum(record.get('vat_amount_numeric', 0) or 0 for record in data)
         total_records = len(data)
         
         # Позиция для итогов (строка после данных + 1 пустая строка)
@@ -214,8 +214,7 @@ class ExcelReportGenerator:
             return "FFC0CB"  # Красный для неоплаченных
             
         # Серый для записей без НДС
-        vat_amount = record.get('vat_amount', '')
-        if vat_amount == 'нет' or vat_amount == '' or self._parse_amount(str(vat_amount)) == 0:
+        if record.get('is_no_vat', False):
             return "D3D3D3"  # Серый для "Без НДС"
             
         return None  # Белый фон для обычных записей

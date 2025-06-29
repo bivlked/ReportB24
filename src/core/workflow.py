@@ -384,16 +384,20 @@ class WorkflowOrchestrator:
                     comp_name = record.get('company_name', 'Не найдено')
                     inn = record.get('company_inn', 'Не найдено')
 
-                    # Формируем данные строки Excel (массив значений в нужном порядке)
-                    row_data = [acc_num, inn, comp_name, sum_val, tax_text, date_bill, ship_date, pay_date]
-                    
-                    # Дополнительные флаги для стилизации
+                    # Формируем данные в новом формате для ExcelReportGenerator
                     processed_record = {
-                        'data': row_data,  # данные строки для Excel
+                        'account_number': acc_num,
+                        'inn': inn,
+                        'counterparty': comp_name,
+                        'amount': sum_val,
+                        'vat_amount': tax_text,
+                        'invoice_date': date_bill,
+                        'shipping_date': ship_date,
+                        'payment_date': pay_date,
                         'is_unpaid': pay_date == "",  # нет даты оплаты = красная строка
                         'is_no_vat': tax_text == "нет",  # нет НДС = серая строка
-                        'amount': float(record.get('opportunity', 0)),  # для расчета итогов
-                        'vat_amount': tax_val  # для расчета итогов НДС
+                        'amount_numeric': float(record.get('opportunity', 0)),  # для расчета итогов
+                        'vat_amount_numeric': tax_val  # для расчета итогов НДС
                     }
                     
                     processed_records.append(processed_record)
@@ -446,8 +450,8 @@ class WorkflowOrchestrator:
         
         # Базовая статистика
         total_records = len(processed_data)
-        total_amount = sum(float(record.get('amount', 0) or 0) for record in processed_data)
-        total_vat = sum(float(record.get('vat_amount', 0) or 0) for record in processed_data)
+        total_amount = sum(float(record.get('amount_numeric', 0) or 0) for record in processed_data)
+        total_vat = sum(float(record.get('vat_amount_numeric', 0) or 0) for record in processed_data)
         
         # Статистика по НДС
         vat_stats = {}
@@ -456,16 +460,16 @@ class WorkflowOrchestrator:
             if vat_rate not in vat_stats:
                 vat_stats[vat_rate] = {"count": 0, "amount": 0}
             vat_stats[vat_rate]["count"] += 1
-            vat_stats[vat_rate]["amount"] += float(record.get('amount', 0) or 0)
+            vat_stats[vat_rate]["amount"] += float(record.get('amount_numeric', 0) or 0)
         
         # Статистика по контрагентам
         contractors = {}
         for record in processed_data:
-            contractor = record.get('contractor', 'Неизвестно')
+            contractor = record.get('counterparty', 'Неизвестно')
             if contractor not in contractors:
                 contractors[contractor] = {"count": 0, "amount": 0}
             contractors[contractor]["count"] += 1
-            contractors[contractor]["amount"] += float(record.get('amount', 0) or 0)
+            contractors[contractor]["amount"] += float(record.get('amount_numeric', 0) or 0)
         
         # Топ-5 контрагентов по сумме
         top_contractors = sorted(

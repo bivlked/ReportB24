@@ -138,6 +138,7 @@ class ExcelReportGenerator:
         """
         for row_index, row_data in enumerate(data):
             is_no_vat = row_data.get('is_no_vat', False)
+            is_unpaid = row_data.get('is_unpaid', False)
             
             for col_index, column in enumerate(self.layout.COLUMNS):
                 excel_row, excel_col = self.layout.get_data_cell_position(row_index, col_index)
@@ -147,6 +148,7 @@ class ExcelReportGenerator:
                 alignment = column.alignment
                 data_style = self.styles.get_data_style(
                     is_no_vat=is_no_vat,
+                    is_unpaid=is_unpaid,
                     alignment_type=alignment
                 )
                 

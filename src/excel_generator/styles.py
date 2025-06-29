@@ -23,7 +23,8 @@ class ColorScheme:
     
     # Data row colors
     NORMAL_FILL = "FFFFFF"  # White background for normal rows
-    NO_VAT_FILL = "F0F0F0"  # Light gray for "Без НДС" rows
+    NO_VAT_FILL = "D3D3D3"  # Gray for "Без НДС" rows (matching ShortReport.py)
+    UNPAID_FILL = "FFC0CB"  # Light red/pink for unpaid invoices
     DATA_FONT = "000000"    # Black text for data
     
     # Border color
@@ -65,7 +66,7 @@ class ExcelStyles:
     
     def _init_fills(self) -> None:
         """Initialize background fill patterns."""
-        # Header fill: green background
+        # Header fill: orange background (matching screenshots)
         self.header_fill = PatternFill(
             start_color=self.colors.HEADER_FILL,
             end_color=self.colors.HEADER_FILL,
@@ -79,10 +80,17 @@ class ExcelStyles:
             fill_type='solid'
         )
         
-        # No VAT row fill: light gray background
+        # No VAT row fill: gray background
         self.no_vat_fill = PatternFill(
             start_color=self.colors.NO_VAT_FILL,
             end_color=self.colors.NO_VAT_FILL,
+            fill_type='solid'
+        )
+        
+        # Unpaid row fill: light red background
+        self.unpaid_fill = PatternFill(
+            start_color=self.colors.UNPAID_FILL,
+            end_color=self.colors.UNPAID_FILL,
             fill_type='solid'
         )
     
@@ -134,20 +142,27 @@ class ExcelStyles:
             'alignment': self.center_alignment
         }
     
-    def get_data_style(self, is_no_vat: bool = False, 
+    def get_data_style(self, is_no_vat: bool = False, is_unpaid: bool = False,
                       alignment_type: str = 'left') -> Dict[str, Any]:
         """
         Get complete data cell style.
         
         Args:
             is_no_vat: True if this is a "Без НДС" row (gray background)
+            is_unpaid: True if this is an unpaid invoice (red background)
             alignment_type: 'left', 'center', or 'right'
         
         Returns:
             Dict containing all data cell style properties
         """
-        # Select fill based on VAT status
-        fill = self.no_vat_fill if is_no_vat else self.normal_fill
+        # Select fill based on payment and VAT status
+        # Priority: unpaid > no_vat > normal
+        if is_unpaid:
+            fill = self.unpaid_fill
+        elif is_no_vat:
+            fill = self.no_vat_fill
+        else:
+            fill = self.normal_fill
         
         # Select alignment
         alignment_map = {
@@ -191,15 +206,16 @@ class ColumnStyleConfig:
     """
     
     # Column alignment mapping (1-based column numbers)
+    # Updated for new column headers: Номер, ИНН, Контрагент, Сумма, НДС, Дата счёта, Дата отгрузки, Дата оплаты
     COLUMN_ALIGNMENTS = {
-        1: 'center',    # № п/п (center)
-        2: 'left',      # Контрагент (left)
-        3: 'center',    # ИНН (center)
-        4: 'right',     # Дата отгрузки (right)
-        5: 'right',     # Номер счета (right)
-        6: 'right',     # Сумма без НДС (right)
-        7: 'center',    # НДС (center)
-        8: 'right',     # Сумма с НДС (right)
+        1: 'center',    # Номер (center)
+        2: 'center',    # ИНН (center)
+        3: 'left',      # Контрагент (left)
+        4: 'right',     # Сумма (right)
+        5: 'center',    # НДС (center)
+        6: 'right',     # Дата счёта (right)
+        7: 'right',     # Дата отгрузки (right)
+        8: 'right',     # Дата оплаты (right)
     }
     
     @classmethod

@@ -32,16 +32,10 @@ class ReportLayout:
     # Column definitions matching the screenshot
     COLUMNS = [
         ColumnDefinition(
-            header="№ п/п",
-            width=8.0,
+            header="Номер",
+            width=15.0,
             alignment="center",
-            data_key="row_number"
-        ),
-        ColumnDefinition(
-            header="Контрагент",
-            width=30.0,
-            alignment="left",
-            data_key="contractor_name"
+            data_key="invoice_number"
         ),
         ColumnDefinition(
             header="ИНН",
@@ -50,34 +44,40 @@ class ReportLayout:
             data_key="inn"
         ),
         ColumnDefinition(
+            header="Контрагент",
+            width=30.0,
+            alignment="left",
+            data_key="contractor_name"
+        ),
+        ColumnDefinition(
+            header="Сумма",
+            width=18.0,
+            alignment="right",
+            data_key="total_amount"
+        ),
+        ColumnDefinition(
+            header="НДС",
+            width=18.0,
+            alignment="center",
+            data_key="vat_amount"
+        ),
+        ColumnDefinition(
+            header="Дата счёта",
+            width=15.0,
+            alignment="right",
+            data_key="invoice_date"
+        ),
+        ColumnDefinition(
             header="Дата отгрузки",
             width=15.0,
             alignment="right",
             data_key="shipment_date"
         ),
         ColumnDefinition(
-            header="Номер счета",
+            header="Дата оплаты",
             width=15.0,
             alignment="right",
-            data_key="invoice_number"
-        ),
-        ColumnDefinition(
-            header="Сумма без НДС",
-            width=18.0,
-            alignment="right",
-            data_key="amount_without_vat"
-        ),
-        ColumnDefinition(
-            header="НДС",
-            width=8.0,
-            alignment="center",
-            data_key="vat_rate"
-        ),
-        ColumnDefinition(
-            header="Сумма с НДС",
-            width=18.0,
-            alignment="right",
-            data_key="amount_with_vat"
+            data_key="payment_date"
         ),
     ]
     

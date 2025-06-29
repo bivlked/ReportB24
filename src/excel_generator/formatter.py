@@ -61,6 +61,8 @@ class ExcelDataFormatter:
         contractor_name = invoice.get('contractor_name', '')
         inn = invoice.get('inn', '')
         shipment_date = invoice.get('shipment_date', '')
+        invoice_date = invoice.get('invoice_date', '')
+        payment_date = invoice.get('payment_date', '')
         invoice_number = invoice.get('invoice_number', '')
         amount = invoice.get('amount', 0)
         vat_rate = invoice.get('vat_rate', '20%')
@@ -68,27 +70,31 @@ class ExcelDataFormatter:
         # Format INN
         formatted_inn = self._format_inn(inn)
         
-        # Format date
-        formatted_date = self._format_date(shipment_date)
+        # Format dates
+        formatted_shipment_date = self._format_date(shipment_date)
+        formatted_invoice_date = self._format_date(invoice_date)
+        formatted_payment_date = self._format_date(payment_date)
         
         # Format amounts and VAT
         formatted_amounts = self._format_amounts(amount, vat_rate)
         
-        # Determine if this is a no-VAT row (for styling)
+        # Determine styling flags
         is_no_vat = self._is_no_vat_row(vat_rate)
+        is_unpaid = self._is_unpaid_row(payment_date)
         
         return {
-            'row_number': row_number,
-            'contractor_name': self._clean_text(contractor_name),
-            'inn': formatted_inn,
-            'shipment_date': formatted_date,
             'invoice_number': self._clean_text(invoice_number),
-            'amount_without_vat': formatted_amounts['without_vat_display'],
-            'vat_rate': formatted_amounts['vat_display'],
-            'amount_with_vat': formatted_amounts['with_vat_display'],
+            'inn': formatted_inn,
+            'contractor_name': self._clean_text(contractor_name),
+            'total_amount': formatted_amounts['with_vat_display'],  # "Сумма" column
+            'vat_amount': formatted_amounts['vat_display'],
+            'invoice_date': formatted_invoice_date,
+            'shipment_date': formatted_shipment_date,
+            'payment_date': formatted_payment_date,
             'amount_without_vat_numeric': formatted_amounts['without_vat_numeric'],
             'amount_with_vat_numeric': formatted_amounts['with_vat_numeric'],
-            'is_no_vat': is_no_vat
+            'is_no_vat': is_no_vat,
+            'is_unpaid': is_unpaid
         }
     
     def _format_inn(self, inn: str) -> str:
@@ -192,6 +198,18 @@ class ExcelDataFormatter:
         vat_info = self.currency_processor.process_vat_rate(vat_rate)
         return vat_info['is_no_vat']
     
+    def _is_unpaid_row(self, payment_date: str) -> bool:
+        """
+        Determine if this is an unpaid row (for red styling).
+        
+        Args:
+            payment_date: Payment date string
+            
+        Returns:
+            True if this row should have red styling
+        """
+        return payment_date == ""
+    
     def _clean_text(self, text: Any) -> str:
         """
         Clean text for Excel display.
@@ -276,6 +294,8 @@ class DataValidator:
             'contractor_name': '',
             'inn': '',
             'shipment_date': '',
+            'invoice_date': '',
+            'payment_date': '',
             'invoice_number': '',
             'amount': 0,
             'vat_rate': '20%'
@@ -301,9 +321,10 @@ class DataValidator:
         if not isinstance(data, list):
             return False
         
+        # Updated required keys matching new data structure
         required_keys = {
-            'row_number', 'contractor_name', 'inn', 'shipment_date',
-            'invoice_number', 'amount_without_vat', 'vat_rate', 'amount_with_vat'
+            'invoice_number', 'inn', 'contractor_name', 'total_amount',
+            'vat_amount', 'invoice_date', 'shipment_date', 'payment_date'
         }
         
         for row in data:

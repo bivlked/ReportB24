@@ -162,6 +162,15 @@ class ReportLayout:
         if 0 <= column_index < len(self.COLUMNS):
             return self.COLUMNS[column_index].alignment
         return "left"
+    
+    def get_column_headers(self) -> List[str]:
+        """
+        Get list of column headers.
+        
+        Returns:
+            List of column header strings
+        """
+        return [col_def.header for col_def in self.COLUMNS]
 
 
 class SummaryLayout:

@@ -246,4 +246,19 @@ class INNProcessor:
         Returns:
             bool: True если ИНН валидный
         """
-        return self.validate_inn(inn).is_valid 
+        return self.validate_inn(inn).is_valid
+    
+    def format_inn(self, inn: Union[str, int, None]) -> str:
+        """
+        Форматирование ИНН для отображения.
+        
+        Args:
+            inn: ИНН для форматирования
+            
+        Returns:
+            str: Отформатированный ИНН или исходная строка если невалидный
+        """
+        result = self.validate_inn(inn)
+        if result.is_valid and result.formatted_inn:
+            return result.formatted_inn
+        return str(inn) if inn is not None else "" 

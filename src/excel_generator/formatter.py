@@ -95,14 +95,11 @@ class ExcelDataFormatter:
         """Format INN using the INN processor."""
         if not inn:
             return ""
-        
-        # Use existing validate_inn method which returns INNValidationResult
-        result = self.inn_processor.validate_inn(inn)
-        if result.is_valid and result.formatted_inn:
-            return result.formatted_inn
-        else:
-            # Return as-is if validation fails
-            return str(inn)
+
+        # Validate and format INN
+        if self.inn_processor.validate_inn(inn):
+            return self.inn_processor.format_inn(inn)
+        return str(inn)
     
     def _format_date(self, date_value: Any) -> str:
         """Format date using the date processor."""
@@ -110,13 +107,8 @@ class ExcelDataFormatter:
             return ""
         
         try:
-            # Use existing parse_date method
-            result = self.date_processor.parse_date(date_value)
-            if result.is_valid and result.formatted_date:
-                return result.formatted_date
-            else:
-                # If parsing fails, return original value as string
-                return str(date_value)
+            # Use date processor format method
+            return self.date_processor.format_date_russian(date_value)
         except Exception:
             return str(date_value) if date_value else ""
     
@@ -164,13 +156,9 @@ class ExcelDataFormatter:
                     with_vat = base_amount
                     vat_display = str(vat_rate)
             
-            # Format for display using existing method
-            without_vat_display = self.currency_processor.format_amount(
-                without_vat, include_currency_symbol=False
-            )
-            with_vat_display = self.currency_processor.format_amount(
-                with_vat, include_currency_symbol=False
-            )
+            # Format for display using Russian formatting method
+            without_vat_display = self.currency_processor.format_currency_russian(without_vat)
+            with_vat_display = self.currency_processor.format_currency_russian(with_vat)
             
             return {
                 'without_vat_display': without_vat_display,
@@ -201,11 +189,8 @@ class ExcelDataFormatter:
         Returns:
             True if this row should have gray styling
         """
-        if not vat_rate:
-            return False
-        
-        vat_lower = str(vat_rate).lower()
-        return 'без ндс' in vat_lower or vat_rate == '0%'
+        vat_info = self.currency_processor.process_vat_rate(vat_rate)
+        return vat_info['is_no_vat']
     
     def _clean_text(self, text: Any) -> str:
         """
@@ -262,12 +247,8 @@ class ExcelSummaryFormatter:
         
         return {
             'record_count': record_count,
-            'total_without_vat': self.currency_processor.format_amount(
-                total_without_vat, include_currency_symbol=False
-            ),
-            'total_with_vat': self.currency_processor.format_amount(
-                total_with_vat, include_currency_symbol=False
-            ),
+            'total_without_vat': self.currency_processor.format_currency_russian(total_without_vat),
+            'total_with_vat': self.currency_processor.format_currency_russian(total_with_vat),
             'total_without_vat_numeric': float(total_without_vat),
             'total_with_vat_numeric': float(total_with_vat)
         }

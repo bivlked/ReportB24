@@ -336,4 +336,19 @@ class DateProcessor:
         elif dt1 > dt2:
             return 1
         else:
-            return 0 
+            return 0
+    
+    def format_date_russian(self, date_value: Union[str, datetime, date, None]) -> str:
+        """
+        Форматирование даты в российский формат для отображения.
+        
+        Args:
+            date_value: Значение даты для форматирования
+            
+        Returns:
+            str: Дата в российском формате или исходная строка если невалидна
+        """
+        result = self.parse_date(date_value)
+        if result.is_valid and result.formatted_date:
+            return result.formatted_date
+        return str(date_value) if date_value is not None else "" 

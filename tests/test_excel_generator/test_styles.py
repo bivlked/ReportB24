@@ -24,7 +24,7 @@ class TestColorScheme:
         scheme = ColorScheme()
         
         # Test header colors
-        assert scheme.HEADER_FILL == "C4D79B"
+        assert scheme.HEADER_FILL == "FFC000"
         assert scheme.HEADER_FONT == "000000"
         
         # Test data row colors
@@ -376,7 +376,7 @@ class TestStylesIntegration:
         styles = ExcelStyles()
         
         # Verify header color is green #C4D79B as shown in screenshots
-        assert styles.colors.HEADER_FILL == "C4D79B"
+        assert styles.colors.HEADER_FILL == "FFC000"
         
         # Verify no-VAT rows are gray as shown in screenshots
         assert styles.colors.NO_VAT_FILL == "F0F0F0"

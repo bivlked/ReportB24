@@ -2,8 +2,8 @@
 Excel styles module for Bitrix24 report generation.
 
 Implements visual formatting that exactly matches the provided screenshots:
-- Green header background #C4D79B
-- Gray rows for "Без НДС" items
+- Orange header background #FFC000 (as shown in screenshot 01.png)
+- Gray rows for "Без НДС" items  
 - White background for normal rows
 - Proper alignment and borders
 """
@@ -17,9 +17,9 @@ from dataclasses import dataclass
 class ColorScheme:
     """Color scheme constants matching the screenshot requirements."""
     
-    # Header colors (green background as shown in screenshots)
-    HEADER_FILL = "C4D79B"  # Light green for headers
-    HEADER_FONT = "000000"  # Black text on green background
+    # Header colors (orange background as shown in screenshots)
+    HEADER_FILL = "FFC000"  # Orange for headers (matching screenshot)
+    HEADER_FONT = "000000"  # Black text on orange background
     
     # Data row colors
     NORMAL_FILL = "FFFFFF"  # White background for normal rows

@@ -465,4 +465,73 @@ class CurrencyProcessor:
             Decimal: Конвертированная сумма
         """
         converted = amount * exchange_rate
-        return converted.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) 
+        return converted.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    
+    def process_vat_rate(self, vat_rate: str) -> dict:
+        """
+        Обработка ставки НДС для Excel formatter.
+        
+        Args:
+            vat_rate: Ставка НДС в виде строки
+            
+        Returns:
+            dict: Информация о НДС включая is_no_vat флаг
+        """
+        vat_rate_clean = vat_rate.strip() if vat_rate else ""
+        
+        if vat_rate_clean in ['Без НДС', '0%', 'нет']:
+            return {
+                'rate': Decimal('0.00'),
+                'rate_str': vat_rate_clean,
+                'is_no_vat': True
+            }
+        elif vat_rate_clean in self.VAT_RATES:
+            return {
+                'rate': self.VAT_RATES[vat_rate_clean],
+                'rate_str': vat_rate_clean,
+                'is_no_vat': False
+            }
+        else:
+            # Попытка извлечь числовое значение
+            try:
+                numeric_match = re.search(r'(\d+(?:[.,]\d+)?)', vat_rate_clean)
+                if numeric_match:
+                    rate_value = Decimal(numeric_match.group(1).replace(',', '.')) / 100
+                    return {
+                        'rate': rate_value,
+                        'rate_str': vat_rate_clean,
+                        'is_no_vat': rate_value == Decimal('0.00')
+                    }
+            except (ValueError, TypeError):
+                pass
+        
+        # По умолчанию считаем что НДС есть
+        return {
+            'rate': Decimal('0.20'),  # 20% по умолчанию
+            'rate_str': vat_rate_clean,
+            'is_no_vat': False
+        }
+    
+    def format_currency_russian(self, amount: Union[Decimal, str, float, None]) -> str:
+        """
+        Форматирование суммы в российском формате для отображения.
+        
+        Args:
+            amount: Сумма для форматирования
+            
+        Returns:
+            str: Отформатированная сумма или исходная строка если невалидна
+        """
+        if amount is None:
+            return ""
+        
+        result = self.parse_amount(amount)
+        if result.is_valid and result.formatted_amount:
+            # Убираем символ валюты для Excel (только число)
+            formatted = result.formatted_amount
+            # Убираем ₽ или другие символы валют
+            for currency_info in self.SUPPORTED_CURRENCIES.values():
+                formatted = formatted.replace(f" {currency_info['symbol']}", "")
+            return formatted
+        
+        return str(amount) 

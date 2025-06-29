@@ -264,7 +264,7 @@ class TestConfigErrorHandling:
         ]
         
         for invalid_url in invalid_urls:
-            with pytest.raises(ValueError, match="Некорректный формат webhook URL"):
+            with pytest.raises(ValueError, match="(Некорректный формат webhook URL|Webhook URL не может быть пустым)"):
                 BitrixConfig(webhook_url=invalid_url)
     
     def test_validation_of_invalid_file_extension(self):

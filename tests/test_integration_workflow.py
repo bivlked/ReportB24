@@ -40,7 +40,7 @@ class TestEndToEndWorkflow:
     
     @patch('src.bitrix24_client.client.Bitrix24Client')
     @patch('src.data_processor.data_processor.DataProcessor')
-    @patch('src.excel_generator.generator.ExcelGenerator')
+    @patch('src.excel_generator.generator.ExcelReportGenerator')
     def test_app_initialization_workflow(self, mock_excel, mock_data, mock_bitrix):
         """Тест полного цикла инициализации приложения."""
         temp_config = self.create_test_config()
@@ -176,7 +176,7 @@ class TestEndToEndWorkflow:
                 Path(temp_config).unlink()
     
     @patch('src.bitrix24_client.client.Bitrix24Client')
-    @patch('src.excel_generator.generator.ExcelGenerator')
+    @patch('src.excel_generator.generator.ExcelReportGenerator')
     def test_report_generation_workflow_mock(self, mock_excel, mock_bitrix):
         """Тест полного workflow генерации отчёта с моками."""
         temp_config = self.create_test_config()

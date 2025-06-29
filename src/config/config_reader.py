@@ -66,6 +66,20 @@ class ReportPeriodConfig:
         
         if not re.match(date_pattern, self.end_date):
             raise ValueError(f"Некорректный формат даты окончания: {self.end_date}")
+        
+        # Проверка корректности дат
+        try:
+            from datetime import datetime
+            start_dt = datetime.strptime(self.start_date, "%d.%m.%Y")
+            end_dt = datetime.strptime(self.end_date, "%d.%m.%Y")
+            
+            if start_dt > end_dt:
+                raise ValueError(f"Дата начала ({self.start_date}) не может быть позже даты окончания ({self.end_date})")
+                
+        except ValueError as e:
+            if "time data" in str(e):
+                raise ValueError(f"Некорректная дата: {e}")
+            raise
 
 
 class ConfigReader:

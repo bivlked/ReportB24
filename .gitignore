@@ -57,4 +57,25 @@ docs/_build/
 # Дистрибутивы
 dist/
 build/
-*.egg-info/ 
+*.egg-info/
+
+# Временные test файлы
+test_*.py
+final_*.py
+*_test.py
+
+# Скриншоты и изображения  
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+
+# Memory Bank временные файлы (используем только memory-bank/)
+activeContext.md
+progress.md  
+projectbrief.md
+
+# Reports (кроме примеров)
+reports/*.xlsx
+!reports/example_*.xlsx 

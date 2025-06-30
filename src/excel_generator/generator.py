@@ -47,13 +47,16 @@ class ExcelReportGenerator:
         self.start_row = 2  # Отступ сверху
         self.start_col = 2  # Отступ слева (столбец B)
     
-    def create_report(self, data: List[Dict[str, Any]], output_path: str) -> None:
+    def create_report(self, data: List[Dict[str, Any]], output_path: str) -> str:
         """
         Создает финальный Excel отчет с полным форматированием.
         
         Args:
             data: Обработанные данные счетов
             output_path: Путь для сохранения файла
+            
+        Returns:
+            Путь к созданному файлу
         """
         try:
             self.logger.info(f"📊 Создание финального Excel отчета: {len(data)} записей")
@@ -84,6 +87,8 @@ class ExcelReportGenerator:
             # Сохраняем файл
             wb.save(output_path)
             self.logger.info(f"✅ Excel отчет успешно создан: {output_path}")
+            
+            return output_path
             
         except Exception as e:
             self.logger.error(f"❌ Ошибка создания Excel отчета: {e}")
@@ -392,11 +397,11 @@ class ExcelReportBuilder:
             Path to the generated report
         """
         try:
-            return self.generator.generate_report(
+            self.generator.create_report(
                 data=invoices,
-                output_path=output_path,
-                sheet_name=report_title
+                output_path=output_path
             )
+            return output_path
         except Exception as e:
             raise ReportGenerationError(f"Failed to generate invoice report: {e}")
     
@@ -413,17 +418,17 @@ class ExcelReportBuilder:
             Dictionary with summary statistics
         """
         try:
-            # Format data
-            formatted_data = self.generator.data_formatter.format_invoice_data(invoices)
-            
-            # Generate summary
-            summary = self.generator.summary_formatter.format_summary(formatted_data)
+            # Calculate basic summary statistics
+            summary = {
+                'record_count': len(invoices),
+                'total_without_vat': sum(record.get('amount', 0) for record in invoices),
+                'total_with_vat': sum(record.get('amount', 0) + record.get('vat_amount', 0) for record in invoices)
+            }
             
             # Generate Excel file
-            self.generator.generate_report(
+            self.generator.create_report(
                 data=invoices,
-                output_path=output_path,
-                sheet_name="Сводка"
+                output_path=output_path
             )
             
             return summary
@@ -451,12 +456,13 @@ class ExcelReportBuilder:
         
         for i, record in enumerate(data):
             try:
-                # Validate record
-                validated = self.generator.validator.validate_invoice_data(record)
+                # Basic validation - check if record has required fields
+                required_fields = ['counterparty', 'amount']
+                missing_fields = [field for field in required_fields if not record.get(field)]
                 
-                # Try formatting
-                formatted = self.generator.data_formatter._format_single_invoice(validated, i + 1)
-                
+                if missing_fields:
+                    raise ValueError(f"Missing required fields: {missing_fields}")
+                    
                 results['valid_records'] += 1
                 
             except Exception as e:

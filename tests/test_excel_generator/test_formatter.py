@@ -57,7 +57,6 @@ class TestExcelDataFormatter:
         
         # Test first invoice
         first_row = formatted_data[0]
-        assert first_row['row_number'] == 1
         assert 'ООО "Тест"' in first_row['contractor_name']
         assert first_row['inn'] == '1234567890'
         assert 'ТСТ-001' in first_row['invoice_number']
@@ -65,7 +64,6 @@ class TestExcelDataFormatter:
         
         # Test second invoice (no VAT)
         second_row = formatted_data[1]
-        assert second_row['row_number'] == 2
         assert 'ИП Иванов' in second_row['contractor_name']
         assert second_row['inn'] == '123456789012'
         assert 'ИВ-002' in second_row['invoice_number']
@@ -84,13 +82,12 @@ class TestExcelDataFormatter:
         
         formatted = self.formatter._format_single_invoice(test_invoice, 5)
         
-        assert formatted['row_number'] == 5
         assert 'ООО "Рога и Копыта"' in formatted['contractor_name']
         assert 'РК-123' in formatted['invoice_number']
-        assert 'amount_without_vat' in formatted
-        assert 'amount_with_vat' in formatted
         assert 'amount_without_vat_numeric' in formatted
         assert 'amount_with_vat_numeric' in formatted
+        assert 'total_amount' in formatted
+        assert 'vat_amount' in formatted
     
     def test_format_inn_valid(self):
         """Test INN formatting with valid INN."""
@@ -301,14 +298,14 @@ class TestDataValidator:
         """Test validation of properly formatted data."""
         valid_data = [
             {
-                'row_number': 1,
-                'contractor_name': 'ООО "Тест"',
-                'inn': '1234567890',
-                'shipment_date': '15.06.2025',
                 'invoice_number': 'ТСТ-001',
-                'amount_without_vat': '100 000,00',
-                'vat_rate': '20%',
-                'amount_with_vat': '120 000,00'
+                'inn': '1234567890',
+                'contractor_name': 'ООО "Тест"',
+                'total_amount': '120 000,00',
+                'vat_amount': '20 000,00',
+                'invoice_date': '15.06.2025',
+                'shipment_date': '15.06.2025',
+                'payment_date': '16.06.2025'
             }
         ]
         

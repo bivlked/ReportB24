@@ -61,7 +61,7 @@ class ExcelReportGenerator:
             # Создаем новую книгу
             wb = Workbook()  
             ws = wb.active
-            ws.title = "Отчет"
+            ws.title = "Краткий"  # 7. Название листа "Краткий"
             
             # 1. Добавляем заголовки с форматированием
             self._add_headers(ws)
@@ -69,17 +69,17 @@ class ExcelReportGenerator:
             # 2. Добавляем данные с правильным форматированием
             self._add_data_rows(ws, data)
             
-            # 3. Добавляем итоги как на скриншоте 04.png
-            self._add_summary_section(ws, data)
+            # 3. Применяем границы только вокруг данных (без итогов)
+            self._apply_data_table_borders(ws, len(data))
             
-            # 4. Применяем финальное форматирование
-            self._apply_final_formatting(ws, len(data))
+            # 4. Добавляем итоги как на скриншоте 04.png (ВНЕ жирной рамки)
+            self._add_summary_section_new_format(ws, data)
             
             # 5. Заморозка заголовков
             self._freeze_headers(ws)
             
-            # 6. Настройка столбцов
-            self._adjust_column_widths(ws)
+            # 6. Настройка столбцов с автошириной
+            self._adjust_column_widths_auto(ws, data)
             
             # Сохраняем файл
             wb.save(output_path)
@@ -101,9 +101,9 @@ class ExcelReportGenerator:
                 value=header
             )
             
-            # Применяем стиль заголовка
+            # 6. Применяем новый цвет заголовков #FCE4D6 (Orange, Accent 2, Lighter 80%)
             cell.font = Font(bold=True, color="000000")  # Жирный черный текст
-            cell.fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")  # Оранжевый фон
+            cell.fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")  # Новый оранжевый фон
             cell.alignment = Alignment(horizontal="center", vertical="center")  # По центру
             
             # Жирные границы для заголовков
@@ -145,6 +145,18 @@ class ExcelReportGenerator:
                     value=value
                 )
                 
+                # 2. Преобразуем номер счета в число для правильного форматирования
+                if col_idx == 0 and value:  # Столбец "Номер"
+                    try:
+                        # Извлекаем числовую часть из номера счета
+                        if isinstance(value, str) and '-' in value:
+                            number_part = value.split('-')[0]
+                            cell.value = int(number_part)
+                        elif isinstance(value, str) and value.isdigit():
+                            cell.value = int(value)
+                    except (ValueError, AttributeError):
+                        pass  # Оставляем как есть, если не удается преобразовать
+                
                 # Цветовая заливка строки
                 if fill_color:
                     cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
@@ -166,45 +178,79 @@ class ExcelReportGenerator:
                     bottom=thin_border
                 )
     
-    def _add_summary_section(self, ws, data: List[Dict[str, Any]]) -> None:
-        """Добавляет итоги как на скриншоте 04.png."""
+    def _apply_data_table_borders(self, ws, data_rows: int) -> None:
+        """4. Применяет жирную рамку только вокруг таблицы с данными (БЕЗ итогов)."""
+        
+        thick_border = Side(border_style="thick", color="000000")
+        
+        # Рамка заканчивается ПОСЛЕ последней строки данных
+        last_data_row = self.start_row + data_rows  # заголовки + данные
+        last_col = self.start_col + 7  # 8 столбцов = индекс 7
+        
+        # Жирная граница только вокруг таблицы с данными
+        for row in range(self.start_row, last_data_row + 1):
+            for col in range(self.start_col, last_col + 1):
+                cell = ws.cell(row=row, column=col)
+                
+                border_left = thick_border if col == self.start_col else cell.border.left
+                border_right = thick_border if col == last_col else cell.border.right  
+                border_top = thick_border if row == self.start_row else cell.border.top
+                border_bottom = thick_border if row == last_data_row else cell.border.bottom
+                
+                cell.border = Border(
+                    left=border_left,
+                    right=border_right,
+                    top=border_top,
+                    bottom=border_bottom
+                )
+    
+    def _add_summary_section_new_format(self, ws, data: List[Dict[str, Any]]) -> None:
+        """5. Добавляет итоги в новом формате как на скриншоте 04.png."""
         
         if not data:
             return
-            
+        
         # Вычисляем итоги
         total_amount = sum(record.get('amount_numeric', 0) or 0 for record in data)
         total_vat = sum(record.get('vat_amount_numeric', 0) or 0 for record in data)
-        total_records = len(data)
         
-        # Позиция для итогов (строка после данных + 1 пустая строка)
-        summary_row = self.start_row + len(data) + 2
+        # Вычисляем счета с НДС и без НДС
+        no_vat_records = [r for r in data if r.get('is_no_vat', False)]
+        with_vat_records = [r for r in data if not r.get('is_no_vat', False)]
         
-        # Строка "ИТОГО:"
-        summary_cell = ws.cell(row=summary_row, column=self.start_col + 2, value="ИТОГО:")  # В столбце "Контрагент"
-        summary_cell.font = Font(bold=True)
-        summary_cell.alignment = Alignment(horizontal="right")
+        no_vat_amount = sum(record.get('amount_numeric', 0) or 0 for record in no_vat_records)
+        with_vat_amount = sum(record.get('amount_numeric', 0) or 0 for record in with_vat_records)
         
-        # Сумма итого
-        amount_cell = ws.cell(row=summary_row, column=self.start_col + 3, value=total_amount)  # Столбец "Сумма"
-        amount_cell.font = Font(bold=True)
-        amount_cell.alignment = Alignment(horizontal="right")
-        amount_cell.number_format = '#,##0.00'
+        # Позиция для итогов (строка после данных + 2 пустые строки)
+        summary_start_row = self.start_row + len(data) + 3
         
-        # НДС итого  
-        vat_cell = ws.cell(row=summary_row, column=self.start_col + 4, value=total_vat)  # Столбец "НДС"
-        vat_cell.font = Font(bold=True)
-        vat_cell.alignment = Alignment(horizontal="right")
-        vat_cell.number_format = '#,##0.00'
+        # 5. Новый формат итогов как на скриншоте 04.png
+        summaries = [
+            ("Всего счетов на сумму:", total_amount),
+            ("Счетов без НДС на сумму:", no_vat_amount), 
+            ("Счетов с НДС на сумму:", with_vat_amount),
+            ("Всего НДС в счетах:", total_vat)
+        ]
         
-        # Жирные границы для итогов
-        thick_border = Side(border_style="thick", color="000000")
+        for idx, (label, amount) in enumerate(summaries):
+            current_row = summary_start_row + idx
+            
+            # Подпись в столбце D (Контрагент)
+            label_cell = ws.cell(row=current_row, column=self.start_col + 2, value=label)
+            label_cell.font = Font(bold=True)
+            label_cell.alignment = Alignment(horizontal="left")
+            
+            # Сумма в столбце E (Сумма)
+            amount_cell = ws.cell(row=current_row, column=self.start_col + 3, value=amount)
+            amount_cell.font = Font(bold=True)
+            amount_cell.alignment = Alignment(horizontal="right")
+            amount_cell.number_format = '#,##0.00'
+            
+            # Выделяем НДС красным цветом
+            if "НДС" in label:
+                amount_cell.font = Font(bold=True, color="FF0000")  # Красный цвет для НДС
         
-        for col_offset in range(8):  # Все столбцы таблицы
-            cell = ws.cell(row=summary_row, column=self.start_col + col_offset)
-            cell.border = Border(bottom=thick_border)
-        
-        self.logger.info(f"📊 Итоги: {total_records} записей, сумма: {total_amount:,.2f}, НДС: {total_vat:,.2f}")
+        self.logger.info(f"📊 Новые итоги: {len(data)} счетов, всего: {total_amount:,.2f}, без НДС: {no_vat_amount:,.2f}, с НДС: {with_vat_amount:,.2f}, НДС: {total_vat:,.2f}")
     
     def _get_row_color(self, record: Dict[str, Any]) -> Optional[str]:
         """Определяет цвет строки по данным записи."""
@@ -237,8 +283,12 @@ class ExcelReportGenerator:
     def _get_column_number_format(self, col_idx: int) -> str:
         """Возвращает числовое форматирование для столбца."""
         
+        # 2. Номер как число (столбец 0)
+        if col_idx == 0:
+            return '0'  # Целое число без разделителей
+        
         # ИНН как число (столбец 1)
-        if col_idx == 1:
+        elif col_idx == 1:
             return '0'  # Целое число без разделителей
             
         # Суммы как числа (столбцы 3, 4)
@@ -261,32 +311,6 @@ class ExcelReportGenerator:
         except (ValueError, TypeError):
             return 0.0
     
-    def _apply_final_formatting(self, ws, data_rows: int) -> None:
-        """Применяет финальное форматирование к таблице."""
-        
-        # Границы вокруг всей таблицы
-        thick_border = Side(border_style="thick", color="000000")
-        
-        total_rows = self.start_row + data_rows + 2  # заголовки + данные + итоги
-        total_cols = self.start_col + 7  # 8 столбцов = индекс 7
-        
-        # Жирная граница вокруг всей таблицы
-        for row in range(self.start_row, total_rows + 1):
-            for col in range(self.start_col, total_cols + 1):
-                cell = ws.cell(row=row, column=col)
-                
-                border_left = thick_border if col == self.start_col else cell.border.left
-                border_right = thick_border if col == total_cols else cell.border.right  
-                border_top = thick_border if row == self.start_row else cell.border.top
-                border_bottom = thick_border if row == total_rows else cell.border.bottom
-                
-                cell.border = Border(
-                    left=border_left,
-                    right=border_right,
-                    top=border_top,
-                    bottom=border_bottom
-                )
-    
     def _freeze_headers(self, ws) -> None:
         """Заморозка заголовков при прокручивании."""
         
@@ -295,22 +319,45 @@ class ExcelReportGenerator:
         ws.freeze_panes = freeze_cell
         self.logger.info(f"🧊 Заголовки заморожены на позиции: {freeze_cell}")
     
-    def _adjust_column_widths(self, ws) -> None:
-        """Настройка ширины столбцов для оптимального отображения."""
+    def _adjust_column_widths_auto(self, ws, data: List[Dict[str, Any]]) -> None:
+        """1. Настройка ширины столбцов с автоподбором для "Контрагент", "Дата счёта", "Дата оплаты"."""
         
+        # 3. Столбец A (пустой) делаем очень узким - примерно как высота строки
+        ws.column_dimensions[get_column_letter(1)].width = 3  # Очень узкий столбец A
+        
+        # Базовые ширины столбцов
         column_widths = {
             self.start_col + 0: 12,  # Номер
             self.start_col + 1: 15,  # ИНН
-            self.start_col + 2: 30,  # Контрагент  
+            self.start_col + 2: 25,  # Контрагент (базовая ширина)
             self.start_col + 3: 15,  # Сумма
             self.start_col + 4: 12,  # НДС
-            self.start_col + 5: 12,  # Дата счёта
-            self.start_col + 6: 12,  # Дата отгрузки
-            self.start_col + 7: 12,  # Дата оплаты
+            self.start_col + 5: 14,  # Дата счёта (базовая ширина)
+            self.start_col + 6: 14,  # Дата отгрузки
+            self.start_col + 7: 14,  # Дата оплаты (базовая ширина)
         }
         
+        # 1. Автоподбор ширины для "Контрагент", "Дата счёта", "Дата оплаты"
+        if data:
+            # Анализируем длину контрагентов
+            max_counterparty_len = max(len(str(record.get('counterparty', ''))) for record in data) if data else 0
+            if max_counterparty_len > 25:
+                column_widths[self.start_col + 2] = min(max_counterparty_len + 2, 50)  # Максимум 50
+            
+            # Анализируем даты (обычно одинаковые по длине, но проверим на всякий случай)
+            max_invoice_date_len = max(len(str(record.get('invoice_date', ''))) for record in data) if data else 0
+            max_payment_date_len = max(len(str(record.get('payment_date', ''))) for record in data) if data else 0
+            
+            if max_invoice_date_len > 14:
+                column_widths[self.start_col + 5] = min(max_invoice_date_len + 2, 20)
+            if max_payment_date_len > 14:
+                column_widths[self.start_col + 7] = min(max_payment_date_len + 2, 20)
+        
+        # Применяем ширины
         for col_num, width in column_widths.items():
             ws.column_dimensions[get_column_letter(col_num)].width = width
+            
+        self.logger.info(f"📏 Настроены ширины столбцов: A={3}, Контрагент={column_widths[self.start_col + 2]}, Даты={column_widths[self.start_col + 5]}")
 
 
 class ReportGenerationError(Exception):

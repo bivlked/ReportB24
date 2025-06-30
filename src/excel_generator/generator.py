@@ -161,8 +161,17 @@ class ExcelReportGenerator:
                 if fill_color:
                     cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
                 
-                # Выравнивание по типу столбца
-                cell.alignment = self._get_column_alignment(col_idx)
+                # 1. Специальное выравнивание для столбца НДС (индекс 4)
+                if col_idx == 4:  # Столбец НДС
+                    if str(value).lower() == "нет":
+                        # Для "нет" - центрирование
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                    else:
+                        # Для числовых значений - правое выравнивание
+                        cell.alignment = Alignment(horizontal="right", vertical="center")
+                else:
+                    # Выравнивание по типу столбца для остальных
+                    cell.alignment = self._get_column_alignment(col_idx)
                 
                 # Числовое форматирование
                 cell.number_format = self._get_column_number_format(col_idx)
@@ -221,8 +230,8 @@ class ExcelReportGenerator:
         no_vat_amount = sum(record.get('amount_numeric', 0) or 0 for record in no_vat_records)
         with_vat_amount = sum(record.get('amount_numeric', 0) or 0 for record in with_vat_records)
         
-        # Позиция для итогов (строка после данных + 2 пустые строки)
-        summary_start_row = self.start_row + len(data) + 3
+        # 2. Позиция для итогов (строка после данных + 1 пустая строка вместо 2)
+        summary_start_row = self.start_row + len(data) + 2
         
         # 5. Новый формат итогов как на скриншоте 04.png
         summaries = [
@@ -235,20 +244,21 @@ class ExcelReportGenerator:
         for idx, (label, amount) in enumerate(summaries):
             current_row = summary_start_row + idx
             
-            # Подпись в столбце D (Контрагент)
+            # 2. Подпись в столбце D (Контрагент) - обычный шрифт, выравнивание по правому краю
             label_cell = ws.cell(row=current_row, column=self.start_col + 2, value=label)
-            label_cell.font = Font(bold=True)
-            label_cell.alignment = Alignment(horizontal="left")
+            label_cell.font = Font(bold=False)  # Убираем жирность
+            label_cell.alignment = Alignment(horizontal="right")  # Правое выравнивание
             
-            # Сумма в столбце E (Сумма)
+            # 2. Сумма в столбце E (Сумма)
             amount_cell = ws.cell(row=current_row, column=self.start_col + 3, value=amount)
-            amount_cell.font = Font(bold=True)
             amount_cell.alignment = Alignment(horizontal="right")
             amount_cell.number_format = '#,##0.00'
             
-            # Выделяем НДС красным цветом
-            if "НДС" in label:
-                amount_cell.font = Font(bold=True, color="FF0000")  # Красный цвет для НДС
+            # 2. Цвет и стиль значений: красный только для НДС, остальные черные жирные
+            if "НДС в счетах" in label:
+                amount_cell.font = Font(bold=True, color="FF0000")  # Красный и жирный только для НДС
+            else:
+                amount_cell.font = Font(bold=True, color="000000")  # Черный и жирный для остальных
         
         self.logger.info(f"📊 Новые итоги: {len(data)} счетов, всего: {total_amount:,.2f}, без НДС: {no_vat_amount:,.2f}, с НДС: {with_vat_amount:,.2f}, НДС: {total_vat:,.2f}")
     

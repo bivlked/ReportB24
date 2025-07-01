@@ -32,11 +32,14 @@ def main():
             app_config = app.config_reader.get_app_config()
             report_period_config = app.config_reader.get_report_period_config()
             
-            print("⚙️ Настройки из config.ini:")
-            print(f"   🌐 Bitrix24: {bitrix_config.webhook_url[:50]}...")
+            # Безопасное отображение конфигурации
+            safe_config = app.config_reader.get_safe_config_info()
+            print("⚙️ Настройки из конфигурации:")
+            print(f"   🌐 Bitrix24: {safe_config['config']['bitrix']['webhook_url']}")
             print(f"   📅 Период: {report_period_config.start_date} - {report_period_config.end_date}")
             print(f"   📂 Папка: {app_config.default_save_folder}")
             print(f"   📄 Файл: {app_config.default_filename}")
+            print(f"   🔐 Источники: config.ini {'✅' if safe_config['sources']['config_ini_exists'] else '❌'}, .env {'✅' if safe_config['sources']['env_file_exists'] else '❌'}")
             print("")
             
             # Валидация конфигурации

@@ -1,0 +1,26 @@
+# ReportB24 Configuration Example
+# Copy this file to config.ini and customize for your environment
+# For security: Store sensitive data (webhook URLs) in .env file
+
+[BitrixAPI]
+# Webhook URL for your Bitrix24 portal
+# SECURITY: Move this to .env file as BITRIX_WEBHOOK_URL
+# webhookurl = https://your-portal.bitrix24.ru/rest/USER_ID/WEBHOOK_CODE/
+
+[AppSettings]
+# Default folder for saving reports (absolute or relative path)
+defaultsavefolder = reports
+
+# Default filename for generated Excel reports
+defaultfilename = bitrix24_report.xlsx
+
+[ReportPeriod]
+# Report period in DD.MM.YYYY format
+# Example period: Q1 2024
+startdate = 01.01.2024
+enddate = 31.03.2024
+
+# Alternative examples:
+# Monthly report: 01.01.2024 to 31.01.2024
+# Quarterly report: 01.04.2024 to 30.06.2024
+# Annual report: 01.01.2024 to 31.12.2024 

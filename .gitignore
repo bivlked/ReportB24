@@ -79,3 +79,34 @@ projectbrief.md
 # Reports (кроме примеров)
 reports/*.xlsx
 !reports/example_*.xlsx 
+
+# Локальные файлы и папки (не для GitHub)
+.LocalOnly/
+
+# Дополнительные временные и тестовые файлы
+test.xlsx
+*.coverage
+.mypy_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Environment variables
+.env.local
+.env.*.local
+
+# Package managers
+node_modules/
+.npm
+.yarn-integrity
+.pnp.*
+
+# Coverage reports
+coverage.xml
+*.cover
+.hypothesis/
+
+# Backup files
+*.bak
+*.backup
+*~ 

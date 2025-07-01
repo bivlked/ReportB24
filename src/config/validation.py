@@ -14,7 +14,7 @@ from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
 import logging
 
-from .config_reader import ConfigReader, BitrixConfig, AppConfig, ReportPeriodConfig
+from .config_reader import ConfigReader, SecureConfigReader, BitrixConfig, AppConfig, ReportPeriodConfig
 from .settings import ValidationSettings, BitrixAPISettings
 
 
@@ -342,7 +342,7 @@ class ComprehensiveValidator:
         # 3. Проверка конфигурации
         self.logger.info("Проверка конфигурации...")
         try:
-            config_reader = ConfigReader(self.config_path)
+            config_reader = SecureConfigReader(self.config_path)
             config_reader.load_config()
             
             # Проверка Bitrix конфигурации

@@ -15,11 +15,12 @@ from typing import Dict, Any, Optional, Union
 from dataclasses import dataclass
 
 try:
-    from dotenv import dotenv_values
+    from dotenv import dotenv_values, load_dotenv
     HAS_DOTENV = True
 except ImportError:
     HAS_DOTENV = False
     dotenv_values = None
+    load_dotenv = None
 
 
 @dataclass
@@ -456,6 +457,10 @@ class SecureConfigReader(ConfigReader):
             FileNotFoundError: Если config.ini не найден
             ValueError: Если конфигурация имеет ошибки
         """
+        # Загружаем переменные из .env в окружение
+        if HAS_DOTENV and load_dotenv and self.env_path.exists():
+            load_dotenv(self.env_path)
+        
         # Загружаем базовую конфигурацию
         super().load_config()
         

@@ -76,7 +76,27 @@ class Bitrix24Client:
             'Accept': 'application/json',
         })
         
-        logger.info(f"Bitrix24 client initialized for {webhook_url}")
+        # Маскируем webhook URL для безопасного логирования
+        masked_url = self._mask_webhook_url(webhook_url)
+        logger.info(f"Bitrix24 client initialized for {masked_url}")
+    
+    def _mask_webhook_url(self, webhook_url: str) -> str:
+        """
+        Маскирует webhook URL для безопасного логирования.
+        
+        Args:
+            webhook_url: Полный webhook URL
+            
+        Returns:
+            str: Маскированный URL вида https://portal.bitrix24.ru/rest/12/***/
+        """
+        import re
+        if not webhook_url or 'https://' not in webhook_url:
+            return webhook_url
+        
+        # Маскируем токен в URL: https://portal.bitrix24.ru/rest/12345/abc123def456 -> https://portal.bitrix24.ru/rest/12345/***/
+        masked = re.sub(r'(/rest/\d+/)[a-zA-Z0-9_]+(/?)$', r'\1***/\2', webhook_url)
+        return masked
     
     def _make_request(
         self,
@@ -461,7 +481,7 @@ class Bitrix24Client:
         return {
             "rate_limiter": self.rate_limiter.get_stats(),
             "session_adapters": len(self.session.adapters),
-            "webhook_url": self.webhook_url,
+            "webhook_url": self._mask_webhook_url(self.webhook_url),
             "timeout": self.timeout,
             "max_retries": self.max_retries,
         }

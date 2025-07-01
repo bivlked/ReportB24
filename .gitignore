@@ -109,4 +109,15 @@ coverage.xml
 # Backup files
 *.bak
 *.backup
-*~ 
+*~
+
+# Файлы с секретами и конфиденциальной информацией
+.env.production
+.env.staging
+.env.development
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python 

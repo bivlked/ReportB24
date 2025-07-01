@@ -3,14 +3,23 @@
 
 Обеспечивает централизованное чтение config.ini и предоставляет
 валидированные настройки для всех компонентов приложения.
+
+Версия 2.1.0: добавлена поддержка .env файлов для безопасного хранения секретов.
 """
 
 import configparser
 import os
 import re
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 from dataclasses import dataclass
+
+try:
+    from dotenv import dotenv_values
+    HAS_DOTENV = True
+except ImportError:
+    HAS_DOTENV = False
+    dotenv_values = None
 
 
 @dataclass
@@ -253,5 +262,317 @@ def create_config_reader(config_path: str = "config.ini") -> ConfigReader:
         ConfigReader: Инициализированный объект ConfigReader
     """
     reader = ConfigReader(config_path)
+    reader.load_config()
+    return reader 
+
+
+class SecureConfigReader(ConfigReader):
+    """
+    Расширенный ConfigReader с поддержкой .env файлов для безопасного хранения секретов.
+    
+    Реализует гибридную систему конфигурации:
+    - Приоритет: os.environ > .env > config.ini
+    - Автоматическая миграция секретов из config.ini в .env
+    - Маскирование конфиденциальных данных в логах
+    - Обратная совместимость с существующим ConfigReader
+    
+    Версия: 2.1.0
+    """
+    
+    # Список конфиденциальных ключей, которые должны храниться в .env
+    SENSITIVE_KEYS = {
+        'webhook_url', 'webhookurl', 'api_key', 'secret_key', 
+        'password', 'token', 'access_token', 'private_key'
+    }
+    
+    def __init__(self, config_path: str = "config.ini", env_path: str = ".env"):
+        """
+        Инициализация SecureConfigReader.
+        
+        Args:
+            config_path: Путь к файлу конфигурации
+            env_path: Путь к .env файлу с секретами
+        """
+        super().__init__(config_path)
+        self.env_path = Path(env_path)
+        self._env_values: Dict[str, str] = {}
+        self._merged_config: Dict[str, Dict[str, str]] = {}
+        self._migration_performed = False
+        
+    def _load_env_values(self) -> Dict[str, str]:
+        """
+        Загружает значения из .env файла без изменения os.environ.
+        
+        Returns:
+            Dict[str, str]: Словарь с переменными из .env файла
+        """
+        if not HAS_DOTENV:
+            print("Warning: python-dotenv не установлен. .env файлы не поддерживаются.")
+            return {}
+        
+        if not self.env_path.exists():
+            return {}
+        
+        try:
+            return dotenv_values(str(self.env_path)) or {}
+        except Exception as e:
+            print(f"Warning: Ошибка чтения {self.env_path}: {e}")
+            return {}
+    
+    def _get_merged_value(self, section: str, key: str, fallback: str = '') -> str:
+        """
+        Получает значение с учётом приоритета: os.environ > .env > config.ini
+        
+        Args:
+            section: Секция конфигурации
+            key: Ключ параметра
+            fallback: Значение по умолчанию
+            
+        Returns:
+            str: Значение с учётом приоритета источников
+        """
+        # Формируем возможные имена переменных окружения
+        env_variants = [
+            f"{section.upper()}_{key.upper()}",
+            key.upper(),
+            f"BITRIX24_{key.upper()}" if section.lower() == 'bitrixapi' else f"{section.upper()}_{key.upper()}"
+        ]
+        
+        # 1. Приоритет: переменные окружения
+        for env_key in env_variants:
+            if env_key in os.environ:
+                return os.environ[env_key]
+        
+        # 2. Приоритет: .env файл
+        for env_key in env_variants:
+            if env_key in self._env_values:
+                return self._env_values[env_key]
+        
+        # 3. Приоритет: config.ini
+        if section in self.config.sections():
+            return self.config.get(section, key, fallback=fallback)
+        
+        return fallback
+    
+    def _mask_sensitive_value(self, key: str, value: str) -> str:
+        """
+        Маскирует конфиденциальные значения для логирования.
+        
+        Args:
+            key: Ключ параметра
+            value: Значение параметра
+            
+        Returns:
+            str: Маскированное значение
+        """
+        if not value or key.lower() not in self.SENSITIVE_KEYS:
+            return value
+        
+        # Специальная обработка для webhook URL
+        if 'webhook' in key.lower() and 'https://' in value:
+            # Маскируем токен в URL: https://portal.bitrix24.ru/rest/12345/abc123def456 -> https://portal.bitrix24.ru/rest/12345/***/
+            import re
+            masked = re.sub(r'(/rest/\d+/)[a-zA-Z0-9_]+(/?)$', r'\1***/\2', value)
+            return masked
+        
+        # Общее маскирование для других секретов
+        if len(value) <= 4:
+            return "***"
+        return value[:2] + "*" * (len(value) - 4) + value[-2:]
+    
+    def _migrate_secrets_to_env(self) -> bool:
+        """
+        Автоматически мигрирует секреты из config.ini в .env файл.
+        
+        Returns:
+            bool: True если миграция была выполнена
+        """
+        if self._migration_performed or not self.config.sections():
+            return False
+        
+        secrets_to_migrate = {}
+        
+        # Ищем конфиденциальные ключи в config.ini
+        for section_name in self.config.sections():
+            for key, value in self.config[section_name].items():
+                if key.lower() in self.SENSITIVE_KEYS and value:
+                    env_key = f"{section_name.upper()}_{key.upper()}"
+                    secrets_to_migrate[env_key] = value
+        
+        if not secrets_to_migrate:
+            self._migration_performed = True
+            return False
+        
+        # Создаём или дополняем .env файл
+        env_content = []
+        
+        # Читаем существующий .env если есть
+        if self.env_path.exists():
+            try:
+                with open(self.env_path, 'r', encoding='utf-8') as f:
+                    env_content = f.readlines()
+            except Exception as e:
+                print(f"Warning: Не удалось прочитать существующий .env файл: {e}")
+        
+        # Добавляем новые секреты
+        migrated_keys = []
+        for env_key, value in secrets_to_migrate.items():
+            # Проверяем, что ключ ещё не существует в .env
+            key_exists = any(line.strip().startswith(f"{env_key}=") for line in env_content)
+            if not key_exists:
+                env_content.append(f"{env_key}={value}\n")
+                migrated_keys.append(env_key)
+        
+        if migrated_keys:
+            try:
+                # Обеспечиваем директорию
+                self.env_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Записываем обновлённый .env
+                with open(self.env_path, 'w', encoding='utf-8') as f:
+                    f.writelines(env_content)
+                
+                print(f"✅ Мигрированы секреты в .env: {', '.join(migrated_keys)}")
+                print(f"⚠️  Рекомендуется удалить эти ключи из config.ini и добавить .env в .gitignore")
+                
+                # Перезагружаем .env значения после миграции
+                self._env_values = self._load_env_values()
+                
+                self._migration_performed = True
+                return True
+                
+            except Exception as e:
+                print(f"Warning: Не удалось записать .env файл: {e}")
+                return False
+        
+        self._migration_performed = True
+        return False
+    
+    def load_config(self) -> None:
+        """
+        Загружает конфигурацию из всех источников с учётом приоритета.
+        
+        Raises:
+            FileNotFoundError: Если config.ini не найден
+            ValueError: Если конфигурация имеет ошибки
+        """
+        # Загружаем базовую конфигурацию
+        super().load_config()
+        
+        # Загружаем .env значения
+        self._env_values = self._load_env_values()
+        
+        # Выполняем автоматическую миграцию секретов
+        self._migrate_secrets_to_env()
+        
+        # Обновляем кэшированные конфигурации для перезагрузки с новыми источниками
+        self._bitrix_config = None
+        self._app_config = None
+        self._report_period_config = None
+    
+    def get_bitrix_config(self) -> BitrixConfig:
+        """
+        Возвращает конфигурацию Bitrix24 с учётом приоритета источников.
+        
+        Returns:
+            BitrixConfig: Валидированная конфигурация Bitrix24
+        """
+        if self._bitrix_config is None:
+            webhook_url = self._get_merged_value('BitrixAPI', 'webhookurl', '')
+            
+            if not webhook_url:
+                raise ValueError("Webhook URL не найден ни в переменных окружения, ни в .env, ни в config.ini")
+            
+            self._bitrix_config = BitrixConfig(webhook_url=webhook_url)
+        
+        return self._bitrix_config
+    
+    def get_app_config(self) -> AppConfig:
+        """
+        Возвращает конфигурацию приложения с учётом приоритета источников.
+        
+        Returns:
+            AppConfig: Валидированная конфигурация приложения
+        """
+        if self._app_config is None:
+            save_folder = self._get_merged_value('AppSettings', 'defaultsavefolder', '')
+            filename = self._get_merged_value('AppSettings', 'defaultfilename', '')
+            
+            self._app_config = AppConfig(
+                default_save_folder=save_folder,
+                default_filename=filename
+            )
+        
+        return self._app_config
+    
+    def get_report_period_config(self) -> ReportPeriodConfig:
+        """
+        Возвращает конфигурацию периода отчёта с учётом приоритета источников.
+        
+        Returns:
+            ReportPeriodConfig: Валидированная конфигурация периода
+        """
+        if self._report_period_config is None:
+            start_date = self._get_merged_value('ReportPeriod', 'startdate', '')
+            end_date = self._get_merged_value('ReportPeriod', 'enddate', '')
+            
+            self._report_period_config = ReportPeriodConfig(
+                start_date=start_date,
+                end_date=end_date
+            )
+        
+        return self._report_period_config
+    
+    def get_safe_config_info(self) -> Dict[str, Any]:
+        """
+        Возвращает информацию о конфигурации с маскированными секретами.
+        
+        Returns:
+            Dict: Безопасная информация о конфигурации для логирования
+        """
+        info = {
+            'sources': {
+                'config_ini_exists': self.config_path.exists(),
+                'env_file_exists': self.env_path.exists(),
+                'env_vars_count': len([k for k in os.environ.keys() if 'BITRIX' in k.upper()]),
+                'dotenv_available': HAS_DOTENV
+            },
+            'config': {}
+        }
+        
+        # Безопасная информация о битрикс конфигурации
+        try:
+            bitrix_config = self.get_bitrix_config()
+            info['config']['bitrix'] = {
+                'webhook_url': self._mask_sensitive_value('webhook_url', bitrix_config.webhook_url)
+            }
+        except Exception as e:
+            info['config']['bitrix'] = {'error': str(e)}
+        
+        # Информация о приложении (не конфиденциальная)
+        try:
+            app_config = self.get_app_config()
+            info['config']['app'] = {
+                'default_save_folder': app_config.default_save_folder,
+                'default_filename': app_config.default_filename
+            }
+        except Exception as e:
+            info['config']['app'] = {'error': str(e)}
+        
+        return info
+
+
+def create_secure_config_reader(config_path: str = "config.ini", env_path: str = ".env") -> SecureConfigReader:
+    """
+    Фабричная функция для создания и инициализации SecureConfigReader.
+    
+    Args:
+        config_path: Путь к файлу конфигурации
+        env_path: Путь к .env файлу
+        
+    Returns:
+        SecureConfigReader: Инициализированный объект SecureConfigReader
+    """
+    reader = SecureConfigReader(config_path, env_path)
     reader.load_config()
     return reader 

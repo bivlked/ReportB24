@@ -316,11 +316,12 @@ class TestBitrix24ClientHighLevel:
             mock_close.assert_called_once()
     
     def test_get_stats(self, client):
-        """Тест: получение статистики"""
+        """Тест: получение статистики с маскированным webhook URL"""
         stats = client.get_stats()
         
         assert 'rate_limiter' in stats
         assert 'webhook_url' in stats
         assert 'timeout' in stats
         assert 'max_retries' in stats
-        assert stats['webhook_url'] == client.webhook_url 
+        # webhook_url теперь возвращается в маскированном виде для безопасности
+        assert stats['webhook_url'] == client._mask_webhook_url(client.webhook_url) 

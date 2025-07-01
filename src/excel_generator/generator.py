@@ -59,6 +59,9 @@ class ExcelReportGenerator:
             Путь к созданному файлу
         """
         try:
+            # Обеспечиваем правильное расширение .xlsx
+            output_path = self._ensure_xlsx_extension(output_path)
+            
             self.logger.info(f"📊 Создание финального Excel отчета: {len(data)} записей")
             
             # Создаем новую книгу
@@ -365,6 +368,27 @@ class ExcelReportGenerator:
             ws.column_dimensions[get_column_letter(col_num)].width = width
             
         self.logger.info(f"📏 Настроены ширины столбцов: A={3}, Контрагент={column_widths[self.start_col + 2]}, Даты={column_widths[self.start_col + 5]}")
+
+    def _ensure_xlsx_extension(self, output_path: str) -> str:
+        """
+        Обеспечивает корректное расширение .xlsx для выходного файла.
+        
+        Args:
+            output_path: Исходный путь к файлу
+            
+        Returns:
+            Путь с правильным расширением .xlsx
+        """
+        path = Path(output_path)
+        
+        # Если нет расширения или расширение не .xlsx
+        if path.suffix.lower() != '.xlsx':
+            # Заменяем расширение на .xlsx
+            new_path = path.with_suffix('.xlsx')
+            self.logger.info(f"📝 Изменено расширение файла: {output_path} → {new_path}")
+            return str(new_path)
+        
+        return output_path
 
 
 class ReportGenerationError(Exception):

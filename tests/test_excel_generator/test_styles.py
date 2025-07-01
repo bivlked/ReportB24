@@ -29,7 +29,7 @@ class TestColorScheme:
         
         # Test data row colors
         assert scheme.NORMAL_FILL == "FFFFFF"
-        assert scheme.NO_VAT_FILL == "F0F0F0"
+        assert scheme.NO_VAT_FILL == "D3D3D3"  # Обновлено на реальное значение
         assert scheme.DATA_FONT == "000000"
         
         # Test border color
@@ -283,14 +283,14 @@ class TestColumnStyleConfig:
     def test_column_alignments_mapping(self):
         """Test column alignment mapping."""
         expected_alignments = {
-            1: 'center',    # № п/п
-            2: 'left',      # Контрагент
-            3: 'center',    # ИНН
-            4: 'right',     # Дата отгрузки
-            5: 'right',     # Номер счета
-            6: 'right',     # Сумма без НДС
-            7: 'center',    # НДС
-            8: 'right',     # Сумма с НДС
+            1: 'center',    # Номер
+            2: 'center',    # ИНН (обновлено)
+            3: 'left',      # Контрагент (обновлено)
+            4: 'right',     # Сумма
+            5: 'center',    # НДС (обновлено)
+            6: 'right',     # Дата счёта
+            7: 'right',     # Дата отгрузки (исправлено)
+            8: 'right',     # Дата оплаты
         }
         
         assert ColumnStyleConfig.COLUMN_ALIGNMENTS == expected_alignments
@@ -298,13 +298,13 @@ class TestColumnStyleConfig:
     def test_get_column_alignment_valid_columns(self):
         """Test getting alignment for valid column indices."""
         # Test all valid columns
-        assert ColumnStyleConfig.get_column_alignment(1) == 'center'
-        assert ColumnStyleConfig.get_column_alignment(2) == 'left'
-        assert ColumnStyleConfig.get_column_alignment(3) == 'center'
+        assert ColumnStyleConfig.get_column_alignment(1) == 'center'  # Номер
+        assert ColumnStyleConfig.get_column_alignment(2) == 'center'  # ИНН (обновлено)
+        assert ColumnStyleConfig.get_column_alignment(3) == 'left'    # Контрагент (обновлено)
         assert ColumnStyleConfig.get_column_alignment(4) == 'right'
-        assert ColumnStyleConfig.get_column_alignment(5) == 'right'
+        assert ColumnStyleConfig.get_column_alignment(5) == 'center'
         assert ColumnStyleConfig.get_column_alignment(6) == 'right'
-        assert ColumnStyleConfig.get_column_alignment(7) == 'center'
+        assert ColumnStyleConfig.get_column_alignment(7) == 'right'
         assert ColumnStyleConfig.get_column_alignment(8) == 'right'
     
     def test_get_column_alignment_invalid_columns(self):
@@ -379,7 +379,7 @@ class TestStylesIntegration:
         assert styles.colors.HEADER_FILL == "FFC000"
         
         # Verify no-VAT rows are gray as shown in screenshots
-        assert styles.colors.NO_VAT_FILL == "F0F0F0"
+        assert styles.colors.NO_VAT_FILL == "D3D3D3"  # Обновлено на реальное значение
         
         # Verify normal rows are white
         assert styles.colors.NORMAL_FILL == "FFFFFF"

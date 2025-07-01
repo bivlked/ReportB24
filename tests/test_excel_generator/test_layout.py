@@ -69,14 +69,14 @@ class TestReportLayout:
     def test_column_definitions_structure(self):
         """Test column definitions match screenshot requirements."""
         expected_columns = [
-            ("№ п/п", 8.0, "center", "row_number"),
-            ("Контрагент", 30.0, "left", "contractor_name"),
+            ("Номер", 15.0, "center", "invoice_number"),
             ("ИНН", 15.0, "center", "inn"),
+            ("Контрагент", 30.0, "left", "contractor_name"),
+            ("Сумма", 18.0, "right", "total_amount"),
+            ("НДС", 18.0, "center", "vat_amount"),
+            ("Дата счёта", 15.0, "right", "invoice_date"),
             ("Дата отгрузки", 15.0, "right", "shipment_date"),
-            ("Номер счета", 15.0, "right", "invoice_number"),
-            ("Сумма без НДС", 18.0, "right", "amount_without_vat"),
-            ("НДС", 8.0, "center", "vat_rate"),
-            ("Сумма с НДС", 18.0, "right", "amount_with_vat"),
+            ("Дата оплаты", 15.0, "right", "payment_date"),
         ]
         
         assert len(self.layout.COLUMNS) == 8
@@ -146,10 +146,10 @@ class TestReportLayout:
     def test_get_column_key(self):
         """Test getting data key for columns."""
         # Test valid columns
-        assert self.layout.get_column_key(0) == "row_number"
-        assert self.layout.get_column_key(1) == "contractor_name"
-        assert self.layout.get_column_key(2) == "inn"
-        assert self.layout.get_column_key(7) == "amount_with_vat"
+        assert self.layout.get_column_key(0) == "invoice_number"
+        assert self.layout.get_column_key(1) == "inn"
+        assert self.layout.get_column_key(2) == "contractor_name"
+        assert self.layout.get_column_key(7) == "payment_date"
         
         # Test invalid columns
         assert self.layout.get_column_key(-1) == ""
@@ -159,11 +159,11 @@ class TestReportLayout:
     def test_get_column_alignment(self):
         """Test getting alignment for columns."""
         # Test valid columns
-        assert self.layout.get_column_alignment(0) == "center"  # № п/п
-        assert self.layout.get_column_alignment(1) == "left"    # Контрагент
-        assert self.layout.get_column_alignment(2) == "center"  # ИНН
-        assert self.layout.get_column_alignment(3) == "right"   # Дата отгрузки
-        assert self.layout.get_column_alignment(7) == "right"   # Сумма с НДС
+        assert self.layout.get_column_alignment(0) == "center"  # Номер
+        assert self.layout.get_column_alignment(1) == "center"  # ИНН
+        assert self.layout.get_column_alignment(2) == "left"    # Контрагент
+        assert self.layout.get_column_alignment(3) == "right"   # Сумма
+        assert self.layout.get_column_alignment(7) == "right"   # Дата оплаты
         
         # Test invalid columns
         assert self.layout.get_column_alignment(-1) == "left"
@@ -401,10 +401,10 @@ class TestLayoutIntegration:
         """Test that layout matches screenshot requirements."""
         layout = ReportLayout()
         
-        # Test Russian column headers match screenshots
+        # Test Russian column headers match screenshots (обновлено под новую структуру)
         expected_headers = [
-            "№ п/п", "Контрагент", "ИНН", "Дата отгрузки",
-            "Номер счета", "Сумма без НДС", "НДС", "Сумма с НДС"
+            "Номер", "ИНН", "Контрагент", "Сумма",
+            "НДС", "Дата счёта", "Дата отгрузки", "Дата оплаты"
         ]
         
         actual_headers = [col.header for col in layout.COLUMNS]
@@ -417,15 +417,15 @@ class TestLayoutIntegration:
         
         # Test alignment matches screenshot requirements
         # Row numbers and INN should be centered
-        assert layout.COLUMNS[0].alignment == "center"  # № п/п
-        assert layout.COLUMNS[2].alignment == "center"  # ИНН
-        assert layout.COLUMNS[6].alignment == "center"  # НДС
+        assert layout.COLUMNS[0].alignment == "center"  # Номер
+        assert layout.COLUMNS[1].alignment == "center"  # ИНН
+        assert layout.COLUMNS[4].alignment == "center"  # НДС
         
         # Names should be left-aligned
-        assert layout.COLUMNS[1].alignment == "left"    # Контрагент
+        assert layout.COLUMNS[2].alignment == "left"    # Контрагент
         
         # Numbers and dates should be right-aligned
-        assert layout.COLUMNS[3].alignment == "right"   # Дата отгрузки
-        assert layout.COLUMNS[4].alignment == "right"   # Номер счета
-        assert layout.COLUMNS[5].alignment == "right"   # Сумма без НДС
-        assert layout.COLUMNS[7].alignment == "right"   # Сумма с НДС 
+        assert layout.COLUMNS[3].alignment == "right"   # Сумма
+        assert layout.COLUMNS[5].alignment == "right"   # Дата счёта
+        assert layout.COLUMNS[6].alignment == "right"   # Дата отгрузки
+        assert layout.COLUMNS[7].alignment == "right"   # Дата оплаты 

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 
-from ..config.config_reader import ConfigReader, create_config_reader
+from ..config.config_reader import ConfigReader, create_config_reader, SecureConfigReader, create_secure_config_reader
 from ..config.settings import APP_NAME, APP_VERSION, get_runtime_info
 from ..config.validation import validate_system
 from ..bitrix24_client.client import Bitrix24Client
@@ -60,7 +60,7 @@ class ReportGeneratorApp:
         self.status = AppStatus()
         
         # Компоненты системы
-        self.config_reader: Optional[ConfigReader] = None
+        self.config_reader: Optional[SecureConfigReader] = None
         self.bitrix_client: Optional[Bitrix24Client] = None
         self.data_processor: Optional[DataProcessor] = None
         self.excel_generator: Optional[ExcelReportGenerator] = None
@@ -139,11 +139,11 @@ class ReportGeneratorApp:
             self.status.is_validated = True
             self._log_info("Системные требования проверены ✓")
             
-            # 2. Загрузка конфигурации
-            self._log_info("Загрузка конфигурации...")
-            self.config_reader = create_config_reader(self.config_path)
+            # 2. Загрузка конфигурации (с поддержкой .env)
+            self._log_info("Загрузка конфигурации с SecureConfigReader...")
+            self.config_reader = create_secure_config_reader(self.config_path)
             self.status.is_configured = True
-            self._log_info("Конфигурация загружена ✓")
+            self._log_info("Конфигурация загружена с поддержкой .env ✓")
             
             # 3. Инициализация компонентов
             self._log_info("Инициализация компонентов...")
@@ -357,7 +357,8 @@ class AppFactory:
     @staticmethod
     def create_app(config_path: str = "config.ini", 
                   enable_logging: bool = True,
-                  auto_initialize: bool = True) -> ReportGeneratorApp:
+                  auto_initialize: bool = True,
+                  use_secure_config: bool = True) -> ReportGeneratorApp:
         """
         Создаёт и опционально инициализирует экземпляр приложения.
         
@@ -365,6 +366,7 @@ class AppFactory:
             config_path: Путь к файлу конфигурации
             enable_logging: Включить логирование
             auto_initialize: Автоматически инициализировать компоненты
+            use_secure_config: Использовать SecureConfigReader с поддержкой .env (по умолчанию True)
             
         Returns:
             ReportGeneratorApp: Настроенный экземпляр приложения

@@ -1,0 +1,59 @@
+# 🔒 GitHub Actions: Автоматическая проверка безопасности
+# Запускается при каждом push и pull request
+
+name: 🛡️ Security Check
+
+on:
+  push:
+    branches: [ main, develop, security-* ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Еженедельная проверка по понедельникам в 09:00 UTC
+    - cron: '0 9 * * 1'
+
+jobs:
+  security-audit:
+    name: 🔍 Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Полная история для проверки
+    
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: 📦 Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: 🔒 Run security check
+      run: |
+        echo "🔍 Запуск проверки безопасности..."
+        python scripts/security_check.py
+        
+    - name: 📋 Check for webhook patterns
+      run: |
+        echo "🔍 Проверка на webhook утечки..."
+        if grep -r "https://[^/]*\.bitrix24\.[^/]*/rest/[^/]*/[^/\*]{10,}/" . --exclude-dir=.git --exclude-dir=node_modules; then
+          echo "❌ Найдены подозрительные webhook URL!"
+          exit 1
+        else
+          echo "✅ Webhook утечки не найдены"
+        fi
+        
+    - name: 🧠 Memory Bank security check
+      run: |
+        echo "🔍 Проверка Memory Bank..."
+        if find memory-bank/ -name "*.md" -exec grep -l "https://[^/]*\.bitrix24\.[^/]*/rest/[^/]*/[^/\*]{5,}/" {} \; | head -1 | grep -q .; then
+          echo "❌ Memory Bank содержит незамаскированные webhook!"
+          exit 1
+        else
+          echo "✅ Memory Bank безопасен"
+        fi

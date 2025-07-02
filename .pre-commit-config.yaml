@@ -1,0 +1,91 @@
+# 🔒 Pre-commit configuration для ReportB24
+# Автоматические проверки безопасности и качества кода
+
+repos:
+  # Базовые проверки файлов
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+        name: 🧹 Удаление trailing whitespace
+      - id: end-of-file-fixer
+        name: 📝 Исправление окончания файлов
+      - id: check-yaml
+        name: ✅ Проверка YAML файлов
+      - id: check-json
+        name: ✅ Проверка JSON файлов
+      - id: check-merge-conflict
+        name: 🔀 Проверка merge conflicts
+      - id: check-added-large-files
+        name: 📦 Проверка больших файлов
+        args: ['--maxkb=1000']
+      - id: detect-private-key
+        name: 🔑 Обнаружение приватных ключей
+
+  # Python код
+  - repo: https://github.com/psf/black
+    rev: 23.3.0
+    hooks:
+      - id: black
+        name: 🖤 Форматирование Python (Black)
+        language_version: python3
+
+  - repo: https://github.com/PyCQA/flake8
+    rev: 6.0.0
+    hooks:
+      - id: flake8
+        name: 🔍 Линтинг Python (flake8)
+        args: ['--max-line-length=88', '--extend-ignore=E203,W503']
+
+  # Проверка секретов
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        name: 🕵️ Обнаружение секретов
+        args: ['--baseline', '.secrets.baseline']
+        exclude: |
+          (?x)(
+            ^tests/.*test.*\.py$|
+            ^.*\.example$|
+            ^SECURITY_INCIDENT_REPORT\.md$
+          )
+
+  # Кастомная проверка безопасности
+  - repo: local
+    hooks:
+      - id: security-check
+        name: 🔒 Проверка утечек webhook
+        entry: python scripts/security_check.py
+        language: python
+        files: '\.(py|md|ini|yaml|yml|txt)$'
+        pass_filenames: false
+        always_run: true
+
+      - id: memory-bank-security
+        name: 🧠 Проверка Memory Bank на утечки
+        entry: bash -c 'grep -r "https://[^/]*\.bitrix24\.[^/]*/rest/[^/]*/[^/\*]{5,}/" memory-bank/ && exit 1 || exit 0'
+        language: system
+        files: '^memory-bank/.*\.md$'
+        pass_filenames: false
+
+      - id: config-security
+        name: ⚙️ Проверка конфигурационных файлов
+        entry: bash -c 'find . -name "*.ini" -not -path "./.*" -exec grep -l "bitrix24\.ru/rest/.*/[a-zA-Z0-9_]\{10,\}/" {} \; | head -1 | grep -q . && exit 1 || exit 0'
+        language: system
+        files: '\.(ini|env)$'
+        pass_filenames: false
+
+# Конфигурация проверок
+default_stages: [commit]
+fail_fast: true
+
+# Exclude patterns
+exclude: |
+  (?x)(
+    /(\.[^/]*cache|__pycache__|node_modules)/|
+    \.(log|tmp|temp)$|
+    ^reports/|
+    ^logs/|
+    ^test_reports/
+  )

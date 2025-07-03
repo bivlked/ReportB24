@@ -213,11 +213,11 @@ class DataProcessor:
         amount_value = None
         
         for key in amount_keys:
-            if key in raw_data and raw_data[key]:
+            if key in raw_data and raw_data[key] is not None:
                 amount_value = raw_data[key]
                 break
         
-        if amount_value:
+        if amount_value is not None:
             result = self.currency_processor.parse_amount(amount_value)
             
             if result.is_valid:

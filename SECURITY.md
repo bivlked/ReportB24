@@ -46,12 +46,12 @@ We take security seriously and appreciate responsible disclosure of security vul
 **For security vulnerabilities**, please use one of these methods:
 
 1. **GitHub Security Advisories** (Preferred)
-   - Go to the [Security](https://github.com/[your-org]/ReportB24/security) tab in our repository
+   - Go to the [Security](https://github.com/bivlked/ReportB24/security) tab in our repository
    - Click "Report a vulnerability"
    - Fill out the security advisory form
 
 2. **GitHub Issues** (For non-sensitive security concerns)
-   - Use the [Issues](https://github.com/[your-org]/ReportB24/issues) section
+   - Use the [Issues](https://github.com/bivlked/ReportB24/issues) section
    - Label with `security` tag
    - Provide detailed information about the issue
 

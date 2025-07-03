@@ -16,28 +16,28 @@ jobs:
   security-audit:
     name: 🔍 Security Audit
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: 📥 Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0  # Полная история для проверки
-    
+
     - name: 🐍 Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-        
+
     - name: 📦 Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        
-    - name: 🔒 Run security check
+
+    - name: 🔒 Run security tests
       run: |
-        echo "🔍 Запуск проверки безопасности..."
-        python scripts/security_check.py
-        
+        echo "🔍 Запуск проверки безопасности через pytest..."
+        pytest tests/ -v --tb=short
+
     - name: 📋 Check for webhook patterns
       run: |
         echo "🔍 Проверка на webhook утечки..."
@@ -47,7 +47,7 @@ jobs:
         else
           echo "✅ Webhook утечки не найдены"
         fi
-        
+
     - name: 🧠 Memory Bank security check
       run: |
         echo "🔍 Проверка Memory Bank..."

@@ -44,6 +44,61 @@ class InvoiceData:
             self.validation_errors = []
 
 
+@dataclass
+class ProductData:
+    """Структура данных товара для детального отчета"""
+    # Основные поля товара
+    product_id: Optional[str] = None
+    product_name: Optional[str] = None
+    price: Optional[Decimal] = None
+    quantity: Optional[Decimal] = None
+    unit_measure: Optional[str] = None
+    
+    # Вычисляемые поля
+    total_amount: Optional[Decimal] = None
+    vat_amount: Optional[Decimal] = None
+    vat_rate: Optional[str] = None
+    
+    # Форматированные значения
+    formatted_price: Optional[str] = None
+    formatted_quantity: Optional[str] = None
+    formatted_total: Optional[str] = None
+    formatted_vat: Optional[str] = None
+    
+    # Валидация
+    is_valid: bool = False
+    validation_errors: List[str] = None
+    
+    def __post_init__(self):
+        if self.validation_errors is None:
+            self.validation_errors = []
+
+
+@dataclass 
+class DetailedInvoiceData:
+    """Структура детальных данных счета с товарами"""
+    # Базовая информация счета
+    invoice_info: Dict[str, Any] = None
+    products: List[ProductData] = None
+    company_name: Optional[str] = None
+    inn: Optional[str] = None
+    
+    # Агрегированные данные
+    total_products: int = 0
+    total_amount: Optional[Decimal] = None
+    total_vat: Optional[Decimal] = None
+    
+    # Метаданные
+    account_number: Optional[str] = None
+    processing_timestamp: Optional[datetime] = None
+    
+    def __post_init__(self):
+        if self.products is None:
+            self.products = []
+        if self.processing_timestamp is None:
+            self.processing_timestamp = datetime.now()
+
+
 class DataProcessor:
     """
     Главный процессор данных - оркестратор.
@@ -289,3 +344,269 @@ class DataProcessor:
         logger.info(f"Обработка завершена: {len(processed_invoices)} счетов")
         
         return processed_invoices
+
+    # ============================================================================
+    # НОВЫЕ МЕТОДЫ ДЛЯ ДЕТАЛЬНОГО ОТЧЕТА - ФАЗА 3: ОБРАБОТКА ДАННЫХ
+    # ============================================================================
+    
+    def process_detailed_invoice_data(
+        self, 
+        detailed_data: Dict[str, Any]
+    ) -> DetailedInvoiceData:
+        """
+        Обработка детальных данных счета включая товары
+        
+        Интегрируется с новыми API методами из Фазы 2:
+        - get_detailed_invoice_data() результаты
+        - Обработка товаров из productRows
+        - Агрегация данных для детального отчета
+        
+        Args:
+            detailed_data: Результат get_detailed_invoice_data() из Bitrix24Client
+            
+        Returns:
+            DetailedInvoiceData: Обработанные детальные данные
+        """
+        try:
+            result = DetailedInvoiceData()
+            
+            # 1. Базовая информация счета
+            result.invoice_info = detailed_data.get('invoice', {})
+            result.company_name = detailed_data.get('company_name', 'Не найдено')
+            result.inn = detailed_data.get('inn', 'Не найдено')
+            result.account_number = detailed_data.get('account_number')
+            result.total_products = detailed_data.get('total_products', 0)
+            
+            # 2. Обработка товаров
+            raw_products = detailed_data.get('products', [])
+            logger.debug(f"Обработка {len(raw_products)} товаров для счета {result.account_number}")
+            
+            for raw_product in raw_products:
+                product = self.format_product_data(raw_product)
+                if product and product.is_valid:
+                    result.products.append(product)
+            
+            # 3. Агрегация данных
+            self._calculate_invoice_totals(result)
+            
+            logger.info(f"Детальные данные обработаны: {len(result.products)} товаров")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Ошибка обработки детальных данных: {e}")
+            return DetailedInvoiceData()
+    
+    def format_product_data(self, raw_product: Dict[str, Any]) -> ProductData:
+        """
+        Форматирование данных товара из productRows
+        
+        Обрабатывает структуру товара из API crm.item.productrow.list:
+        - Валидация цены и количества
+        - Расчет общей суммы и НДС 
+        - Форматирование для Excel отчета
+        
+        Args:
+            raw_product: Сырые данные товара из productRows
+            
+        Returns:
+            ProductData: Обработанные данные товара
+        """
+        product = ProductData()
+        
+        try:
+            # Извлечение базовых данных
+            product.product_id = str(raw_product.get('id', '')).strip()
+            product_name = str(raw_product.get('productName', 'Товар без названия')).strip()
+            product.product_name = product_name if product_name else 'Товар без названия'
+            product.unit_measure = str(raw_product.get('measureName', 'шт')).strip()
+            
+            # Обработка цены
+            price_result = self.currency_processor.parse_amount(
+                raw_product.get('price', 0)
+            )
+            if price_result.is_valid:
+                product.price = price_result.amount
+                product.formatted_price = price_result.formatted_amount
+            else:
+                product.validation_errors.append(f"Невалидная цена: {raw_product.get('price')}")
+                product.price = Decimal('0')
+                product.formatted_price = "0,00"
+            
+            # Обработка количества
+            quantity_result = self.currency_processor.parse_amount(
+                raw_product.get('quantity', 0)
+            )
+            if quantity_result.is_valid:
+                product.quantity = quantity_result.amount
+                product.formatted_quantity = f"{float(product.quantity):,.3f}".replace(',', ' ').replace('.', ',')
+            else:
+                product.validation_errors.append(f"Невалидное количество: {raw_product.get('quantity')}")
+                product.quantity = Decimal('0')
+                product.formatted_quantity = "0,000"
+            
+            # Расчет общей суммы товара
+            product.total_amount = product.price * product.quantity
+            product.formatted_total = f"{float(product.total_amount):,.2f}".replace(',', ' ').replace('.', ',')
+            
+            # Расчет НДС (предполагаем 20%)
+            vat_result = self.currency_processor.calculate_vat(
+                product.total_amount, '20%', amount_includes_vat=True
+            )
+            if vat_result.is_valid:
+                product.vat_amount = vat_result.vat_amount
+                product.vat_rate = "20%"
+                product.formatted_vat = f"{float(product.vat_amount):,.2f}".replace(',', ' ').replace('.', ',')
+            else:
+                product.vat_amount = Decimal('0')
+                product.vat_rate = "0%"
+                product.formatted_vat = "0,00"
+            
+            # Валидация товара
+            product.is_valid = bool(
+                product.product_name and 
+                product.price >= 0 and 
+                product.quantity >= 0
+            )
+            
+            if not product.is_valid:
+                product.validation_errors.append("Товар не прошел базовую валидацию")
+            
+            logger.debug(f"Товар обработан: {product.product_name} - {product.formatted_total}")
+            
+        except Exception as e:
+            logger.error(f"Ошибка форматирования товара: {e}")
+            product.validation_errors.append(f"Критическая ошибка: {e}")
+            product.is_valid = False
+        
+        return product
+    
+    def group_products_by_invoice(
+        self, 
+        invoices_products: Dict[int, List[Dict[str, Any]]]
+    ) -> Dict[int, DetailedInvoiceData]:
+        """
+        Группировка товаров по счетам для batch обработки
+        
+        Обрабатывает результат get_products_by_invoices_batch():
+        - Группирует товары по invoice_id
+        - Создает DetailedInvoiceData для каждого счета
+        - Агрегирует данные для зебра-эффекта в Excel
+        
+        Args:
+            invoices_products: Результат get_products_by_invoices_batch()
+                               {invoice_id: [products_list]}
+            
+        Returns:
+            Dict[invoice_id, DetailedInvoiceData]: Сгруппированные данные
+        """
+        grouped_data = {}
+        
+        logger.info(f"Группировка товаров для {len(invoices_products)} счетов")
+        
+        for invoice_id, raw_products in invoices_products.items():
+            try:
+                # Создаем структуру детальных данных
+                invoice_data = DetailedInvoiceData()
+                invoice_data.account_number = f"Счет #{invoice_id}"
+                invoice_data.total_products = len(raw_products)
+                
+                # Обрабатываем товары
+                valid_products = []
+                for raw_product in raw_products:
+                    product = self.format_product_data(raw_product)
+                    if product and product.is_valid:
+                        valid_products.append(product)
+                
+                invoice_data.products = valid_products
+                
+                # Агрегируем данные
+                self._calculate_invoice_totals(invoice_data)
+                
+                grouped_data[invoice_id] = invoice_data
+                
+                logger.debug(f"Счет {invoice_id}: {len(valid_products)} товаров, сумма {invoice_data.total_amount}")
+                
+            except Exception as e:
+                logger.error(f"Ошибка группировки товаров для счета {invoice_id}: {e}")
+                # Создаем пустую структуру для счета с ошибкой
+                error_data = DetailedInvoiceData()
+                error_data.account_number = f"Счет #{invoice_id} (ошибка)"
+                grouped_data[invoice_id] = error_data
+        
+        logger.info(f"Группировка завершена: {len(grouped_data)} счетов обработано")
+        return grouped_data
+    
+    def _calculate_invoice_totals(self, invoice_data: DetailedInvoiceData) -> None:
+        """
+        Расчет агрегированных данных по счету
+        
+        Args:
+            invoice_data: Структура данных счета для обновления
+        """
+        if not invoice_data.products:
+            invoice_data.total_amount = Decimal('0')
+            invoice_data.total_vat = Decimal('0')
+            return
+        
+        total_amount = Decimal('0')
+        total_vat = Decimal('0')
+        
+        for product in invoice_data.products:
+            if product.is_valid:
+                total_amount += product.total_amount or Decimal('0')
+                total_vat += product.vat_amount or Decimal('0')
+        
+        invoice_data.total_amount = total_amount
+        invoice_data.total_vat = total_vat
+        
+        logger.debug(f"Агрегация для {invoice_data.account_number}: "
+                    f"сумма {total_amount}, НДС {total_vat}")
+
+    def format_products_for_excel(
+        self, 
+        grouped_data: Dict[int, DetailedInvoiceData]
+    ) -> List[Dict[str, Any]]:
+        """
+        Форматирование товаров для Excel с зебра-эффектом по счетам
+        
+        Создает список строк для детального Excel отчета:
+        - Группировка по счетам для зебра-эффекта
+        - Форматированные суммы и количества
+        - Правильный порядок колонок для отчета
+        
+        Args:
+            grouped_data: Сгруппированные данные по счетам
+            
+        Returns:
+            List[Dict]: Строки для Excel отчета
+        """
+        excel_rows = []
+        
+        logger.info(f"Форматирование для Excel: {len(grouped_data)} счетов")
+        
+        # Сортируем счета по номеру для консистентности
+        sorted_invoices = sorted(grouped_data.items(), key=lambda x: x[0])
+        
+        for invoice_id, invoice_data in sorted_invoices:
+            # Добавляем товары этого счета
+            for product in invoice_data.products:
+                if product.is_valid:
+                    excel_row = {
+                        'invoice_number': invoice_data.account_number,
+                        'company_name': invoice_data.company_name or 'Не найдено',
+                        'inn': invoice_data.inn or 'Не найдено',
+                        'product_name': product.product_name,
+                        'quantity': product.formatted_quantity,
+                        'unit_measure': product.unit_measure,
+                        'price': product.formatted_price,
+                        'total_amount': product.formatted_total,
+                        'vat_amount': product.formatted_vat,
+                        
+                        # Метаданные для группировки
+                        'invoice_id': invoice_id,
+                        'is_first_product': len(excel_rows) == 0 or excel_rows[-1].get('invoice_id') != invoice_id
+                    }
+                    excel_rows.append(excel_row)
+        
+        logger.info(f"Excel форматирование завершено: {len(excel_rows)} строк товаров")
+        return excel_rows

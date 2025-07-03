@@ -492,4 +492,191 @@ class Bitrix24Client:
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit"""
-        self.close() 
+        self.close()
+
+    def get_products_by_invoice(self, invoice_id: int) -> List[Dict[str, Any]]:
+        """
+        Получение товаров по ID счета через crm.item.productrow.list
+        
+        На основе успешного Proof of Concept с правильными параметрами:
+        - =ownerType: SI (Smart Invoice)
+        - =ownerId: ID счета
+        
+        Args:
+            invoice_id: ID Smart Invoice счета
+            
+        Returns:
+            List[Dict]: Список товаров счета
+        """
+        try:
+            params = {
+                'filter': {
+                    '=ownerType': 'SI',  # Smart Invoice (проверено в PoC)
+                    '=ownerId': invoice_id
+                }
+            }
+            
+            logger.debug(f"Getting products for invoice {invoice_id}")
+            response = self._make_request('POST', 'crm.item.productrow.list', data=params)
+            
+            if response and response.success:
+                # Структура ответа проверена в PoC: result.productRows
+                products = response.data.get('productRows', []) if isinstance(response.data, dict) else []
+                logger.info(f"Retrieved {len(products)} products for invoice {invoice_id}")
+                return products
+            else:
+                logger.warning(f"No products found for invoice {invoice_id}: {response.error if response else 'Unknown error'}")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error getting products for invoice {invoice_id}: {e}")
+            return []
+    
+    def get_products_by_invoices_batch(
+        self, 
+        invoice_ids: List[int], 
+        chunk_size: int = 50
+    ) -> Dict[int, List[Dict[str, Any]]]:
+        """
+        Batch получение товаров для списка счетов через crm.item.productrow.list
+        
+        Реализует Hybrid Caching Architecture из creative phase:
+        - Группированная обработка по chunk_size
+        - Batch API optimization для производительности
+        - Возврат структурированных данных по счетам
+        
+        Args:
+            invoice_ids: Список ID Smart Invoice счетов
+            chunk_size: Размер batch (макс. 50 для Bitrix24)
+            
+        Returns:
+            Dict[invoice_id, products_list]: Товары сгруппированные по счетам
+        """
+        if not invoice_ids:
+            return {}
+        
+        all_products = {}
+        
+        # Обрабатываем по chunks для соблюдения лимитов Bitrix24
+        for i in range(0, len(invoice_ids), chunk_size):
+            chunk_ids = invoice_ids[i:i + chunk_size]
+            
+            try:
+                # Строим batch запрос для chunk
+                batch_data = {}
+                for j, invoice_id in enumerate(chunk_ids):
+                    batch_data[f'products_invoice_{invoice_id}'] = {
+                        'method': 'crm.item.productrow.list',
+                        'params': {
+                            'filter': {
+                                '=ownerType': 'SI',
+                                '=ownerId': invoice_id
+                            }
+                        }
+                    }
+                
+                logger.debug(f"Batch request for {len(chunk_ids)} invoices (chunk {i//chunk_size + 1})")
+                
+                # Отправляем batch запрос
+                batch_response = self._make_request('POST', 'batch', data={'cmd': batch_data})
+                
+                if batch_response and batch_response.success:
+                    batch_results = batch_response.data.get('result', {}) if isinstance(batch_response.data, dict) else {}
+                    
+                    # Обрабатываем результаты batch
+                    for key, result in batch_results.items():
+                        # Извлекаем invoice_id из ключа: products_invoice_123 -> 123
+                        try:
+                            invoice_id = int(key.split('_')[-1])
+                        except (ValueError, IndexError):
+                            logger.warning(f"Cannot parse invoice_id from batch key: {key}")
+                            continue
+                        
+                        # Извлекаем товары из результата
+                        if isinstance(result, dict) and 'productRows' in result:
+                            products = result['productRows']
+                        elif isinstance(result, list):
+                            products = result
+                        else:
+                            products = []
+                        
+                        all_products[invoice_id] = products
+                        logger.debug(f"Invoice {invoice_id}: {len(products)} products")
+                        
+                else:
+                    logger.warning(f"Batch request failed for chunk {i//chunk_size + 1}: {batch_response.error if batch_response else 'Unknown error'}")
+                    
+                    # Fallback: sequential requests for this chunk
+                    logger.info(f"Falling back to sequential requests for chunk {i//chunk_size + 1}")
+                    for invoice_id in chunk_ids:
+                        all_products[invoice_id] = self.get_products_by_invoice(invoice_id)
+                
+            except Exception as e:
+                logger.error(f"Error in batch request for chunk {i//chunk_size + 1}: {e}")
+                
+                # Fallback: sequential requests
+                for invoice_id in chunk_ids:
+                    all_products[invoice_id] = self.get_products_by_invoice(invoice_id)
+        
+        total_products = sum(len(products) for products in all_products.values())
+        logger.info(f"Batch processing complete: {len(all_products)} invoices, {total_products} total products")
+        
+        return all_products
+    
+    def get_detailed_invoice_data(self, invoice_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Получение детальной информации по счету включая товары и реквизиты
+        
+        Комбинирует данные счета, товаров и реквизитов для детального отчета.
+        Использует существующие методы для получения полной картины.
+        
+        Args:
+            invoice_id: ID Smart Invoice счета
+            
+        Returns:
+            Dict: Детальная информация о счете или None при ошибке
+        """
+        try:
+            # 1. Получаем базовую информацию о счете
+            params = {
+                'entityTypeId': 31,  # Smart Invoices
+                'filter': {'id': invoice_id},
+                'select': ['id', 'title', 'opportunity', 'accountNumber', 'stageId']
+            }
+            
+            invoice_response = self._make_request('POST', 'crm.item.list', data=params)
+            
+            if not (invoice_response and invoice_response.success and 
+                    invoice_response.data and invoice_response.data.get('items')):
+                logger.warning(f"Invoice {invoice_id} not found or inaccessible")
+                return None
+            
+            invoice_info = invoice_response.data['items'][0]
+            
+            # 2. Получаем товары по счету
+            products = self.get_products_by_invoice(invoice_id)
+            
+            # 3. Получаем реквизиты (если есть accountNumber)
+            account_number = invoice_info.get('accountNumber')
+            company_name = "Не найдено"
+            inn = "Не найдено"
+            
+            if account_number:
+                company_name, inn = self.get_company_info_by_invoice(account_number)
+            
+            # 4. Формируем детальную структуру
+            detailed_data = {
+                'invoice': invoice_info,
+                'products': products,
+                'company_name': company_name,
+                'inn': inn,
+                'total_products': len(products),
+                'account_number': account_number
+            }
+            
+            logger.info(f"Retrieved detailed data for invoice {invoice_id}: {len(products)} products")
+            return detailed_data
+            
+        except Exception as e:
+            logger.error(f"Error getting detailed invoice data for {invoice_id}: {e}")
+            return None 

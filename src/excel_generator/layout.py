@@ -278,4 +278,350 @@ class WorksheetBuilder:
                 if isinstance(amount, (int, float)):
                     totals['amount_with_vat'] += amount
         
-        return totals 
+        return totals
+
+
+# ============================================================================
+# ДЕТАЛЬНЫЙ ОТЧЕТ LAYOUT - ФАЗА 4: EXCEL ГЕНЕРАЦИЯ
+# ============================================================================
+
+class DetailedReportLayout:
+    """
+    Layout configuration for detailed report with product breakdown.
+    
+    Создает макет для листа "Полный" с детальной информацией о товарах.
+    Интегрируется с DataProcessor из Фазы 3 для обработки данных товаров.
+    """
+    
+    # Column definitions for detailed report (8 columns)
+    COLUMNS = [
+        ColumnDefinition(
+            header="Номер счёта",
+            width=18.0,
+            alignment="center",
+            data_key="invoice_number"
+        ),
+        ColumnDefinition(
+            header="Контрагент", 
+            width=25.0,
+            alignment="left",
+            data_key="company_name"
+        ),
+        ColumnDefinition(
+            header="ИНН",
+            width=15.0,
+            alignment="center",
+            data_key="inn"
+        ),
+        ColumnDefinition(
+            header="Наименование товара",
+            width=35.0,
+            alignment="left",
+            data_key="product_name"
+        ),
+        ColumnDefinition(
+            header="Кол-во",
+            width=12.0,
+            alignment="right",
+            data_key="quantity"
+        ),
+        ColumnDefinition(
+            header="Ед. изм.",
+            width=10.0,
+            alignment="center",
+            data_key="unit_measure"
+        ),
+        ColumnDefinition(
+            header="Цена",
+            width=15.0,
+            alignment="right",
+            data_key="price"
+        ),
+        ColumnDefinition(
+            header="Сумма",
+            width=18.0,
+            alignment="right",
+            data_key="total_amount"
+        ),
+    ]
+    
+    # Layout constants (same as brief report for consistency)
+    HEADER_ROW = 2
+    DATA_START_ROW = 3
+    START_COLUMN = 2
+    
+    # Green header color from Hello World Excel Test
+    HEADER_FILL_COLOR = "C6E0B4"  # Green color for headers
+    
+    def __init__(self):
+        self.total_columns = len(self.COLUMNS)
+    
+    def setup_worksheet(self, ws: Worksheet) -> None:
+        """
+        Set up detailed worksheet with proper structure and styling.
+        
+        Применяет зеленые заголовки, заморозку панелей и границы
+        как в Hello World Excel Test из Фазы 0.
+        
+        Args:
+            ws: OpenPyXL worksheet object
+        """
+        from openpyxl.styles import PatternFill, Border, Side, Alignment
+        
+        # Set column widths
+        for i, col_def in enumerate(self.COLUMNS, start=self.START_COLUMN):
+            col_letter = ws.cell(row=1, column=i).column_letter
+            ws.column_dimensions[col_letter].width = col_def.width
+        
+        # Set row heights
+        ws.row_dimensions[self.HEADER_ROW].height = 22  # Slightly taller for detailed headers
+        
+        # Freeze panes at first data row
+        freeze_cell = ws.cell(row=self.DATA_START_ROW, column=self.START_COLUMN)
+        ws.freeze_panes = freeze_cell
+        
+        # Apply header styling (green background)
+        header_fill = PatternFill(start_color=self.HEADER_FILL_COLOR, 
+                                end_color=self.HEADER_FILL_COLOR, 
+                                fill_type="solid")
+        
+        # Border style for professional look
+        border_style = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        # Apply styling to header row
+        for i in range(self.START_COLUMN, self.START_COLUMN + self.total_columns):
+            header_cell = ws.cell(row=self.HEADER_ROW, column=i)
+            header_cell.fill = header_fill
+            header_cell.border = border_style
+            header_cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    def write_headers(self, ws: Worksheet) -> None:
+        """
+        Write column headers for detailed report.
+        
+        Args:
+            ws: OpenPyXL worksheet object
+        """
+        for i, col_def in enumerate(self.COLUMNS, start=self.START_COLUMN):
+            cell = ws.cell(row=self.HEADER_ROW, column=i)
+            cell.value = col_def.header
+    
+    def apply_zebra_effect(self, ws: Worksheet, data_rows: List[Dict[str, Any]]) -> None:
+        """
+        Применение зебра-эффекта для группировки по счетам.
+        
+        Чередует цвет строк для каждого нового счета, чтобы
+        визуально разделить товары разных счетов.
+        
+        Args:
+            ws: OpenPyXL worksheet object  
+            data_rows: Список строк данных с метаданными группировки
+        """
+        from openpyxl.styles import PatternFill
+        
+        # Colors for zebra effect (light gray for alternating invoices)
+        zebra_color = "F2F2F2"  # Light gray
+        zebra_fill = PatternFill(start_color=zebra_color, 
+                               end_color=zebra_color, 
+                               fill_type="solid")
+        
+        current_invoice_id = None
+        use_zebra = False
+        
+        for row_idx, row_data in enumerate(data_rows):
+            invoice_id = row_data.get('invoice_id')
+            
+            # Check if we're starting a new invoice group
+            if invoice_id != current_invoice_id:
+                current_invoice_id = invoice_id
+                use_zebra = not use_zebra  # Toggle zebra effect
+            
+            # Apply zebra fill to this row if needed
+            if use_zebra:
+                excel_row = self.DATA_START_ROW + row_idx
+                for col_idx in range(self.START_COLUMN, self.START_COLUMN + self.total_columns):
+                    cell = ws.cell(row=excel_row, column=col_idx)
+                    cell.fill = zebra_fill
+    
+    def get_data_cell_position(self, row_index: int, column_index: int) -> Tuple[int, int]:
+        """
+        Get Excel cell position for detailed data.
+        
+        Args:
+            row_index: 0-based data row index
+            column_index: 0-based column index
+            
+        Returns:
+            Tuple of (row, column) in 1-based Excel coordinates
+        """
+        excel_row = self.DATA_START_ROW + row_index
+        excel_col = self.START_COLUMN + column_index
+        return excel_row, excel_col
+    
+    def get_column_key(self, column_index: int) -> str:
+        """Get data key for a column in detailed report."""
+        if 0 <= column_index < len(self.COLUMNS):
+            return self.COLUMNS[column_index].data_key
+        return ""
+    
+    def get_column_alignment(self, column_index: int) -> str:
+        """Get alignment for a column in detailed report."""
+        if 0 <= column_index < len(self.COLUMNS):
+            return self.COLUMNS[column_index].alignment
+        return "left"
+    
+    def get_column_headers(self) -> List[str]:
+        """Get list of column headers for detailed report."""
+        return [col_def.header for col_def in self.COLUMNS]
+
+
+class DetailedWorksheetBuilder:
+    """
+    Builder for creating detailed report worksheets.
+    
+    Создает и настраивает листы для детального отчета с товарами.
+    Интегрируется с DataProcessor для обработки данных.
+    """
+    
+    def __init__(self):
+        self.layout = DetailedReportLayout()
+    
+    def create_detailed_worksheet(
+        self, 
+        workbook: Workbook, 
+        sheet_name: str = "Полный"
+    ) -> Worksheet:
+        """
+        Create and configure detailed worksheet.
+        
+        Args:
+            workbook: OpenPyXL workbook object
+            sheet_name: Name for the detailed worksheet
+            
+        Returns:
+            Configured detailed worksheet object
+        """
+        # Create new worksheet (don't replace existing ones)
+        ws = workbook.create_sheet(sheet_name)
+        
+        # Apply detailed layout configuration
+        self.layout.setup_worksheet(ws)
+        self.layout.write_headers(ws)
+        
+        return ws
+    
+    def write_detailed_data(
+        self, 
+        ws: Worksheet, 
+        data_rows: List[Dict[str, Any]]
+    ) -> None:
+        """
+        Write detailed product data to worksheet.
+        
+        Записывает данные товаров с применением зебра-эффекта
+        для группировки по счетам.
+        
+        Args:
+            ws: OpenPyXL worksheet object
+            data_rows: List of formatted product data from DataProcessor
+        """
+        from openpyxl.styles import Alignment, Border, Side
+        
+        # Border for data cells
+        border_style = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        # Write data rows
+        for row_idx, row_data in enumerate(data_rows):
+            for col_idx, col_def in enumerate(self.layout.COLUMNS):
+                excel_row, excel_col = self.layout.get_data_cell_position(row_idx, col_idx)
+                
+                cell = ws.cell(row=excel_row, column=excel_col)
+                cell.value = row_data.get(col_def.data_key, "")
+                
+                # Apply alignment
+                cell.alignment = Alignment(horizontal=col_def.alignment, vertical="center")
+                
+                # Apply border
+                cell.border = border_style
+        
+        # Apply zebra effect after writing all data
+        self.layout.apply_zebra_effect(ws, data_rows)
+    
+    def add_detailed_summary(
+        self, 
+        ws: Worksheet, 
+        data_row_count: int,
+        summary_stats: Dict[str, Any]
+    ) -> None:
+        """
+        Add summary section for detailed report.
+        
+        Args:
+            ws: OpenPyXL worksheet object
+            data_row_count: Number of product rows written
+            summary_stats: Summary statistics (total products, invoices, etc.)
+        """
+        # Calculate summary start row
+        summary_start_row = self.layout.DATA_START_ROW + data_row_count + 2
+        
+        # Products count
+        ws.cell(row=summary_start_row, column=self.layout.START_COLUMN).value = "Всего товаров:"
+        ws.cell(row=summary_start_row, column=self.layout.START_COLUMN + 1).value = data_row_count
+        
+        # Invoices count
+        if 'total_invoices' in summary_stats:
+            invoices_row = summary_start_row + 1
+            ws.cell(row=invoices_row, column=self.layout.START_COLUMN).value = "Всего счетов:"
+            ws.cell(row=invoices_row, column=self.layout.START_COLUMN + 1).value = summary_stats['total_invoices']
+
+
+class MultiSheetBuilder:
+    """
+    Builder for creating multi-sheet reports (Brief + Detailed).
+    
+    Создает Excel файл с двумя листами: "Краткий" и "Полный".
+    Координирует работу обычного и детального макетов.
+    """
+    
+    def __init__(self):
+        self.brief_builder = WorksheetBuilder()
+        self.detailed_builder = DetailedWorksheetBuilder()
+    
+    def create_multi_sheet_workbook(self) -> Workbook:
+        """
+        Create workbook with both brief and detailed sheets.
+        
+        Returns:
+            Workbook with "Краткий" and "Полный" sheets
+        """
+        workbook = Workbook()
+        
+        # Remove default sheet if exists
+        if workbook.worksheets:
+            workbook.remove(workbook.active)
+        
+        # Create brief sheet first
+        brief_ws = self.brief_builder.create_worksheet(workbook, "Краткий")
+        
+        # Create detailed sheet
+        detailed_ws = self.detailed_builder.create_detailed_worksheet(workbook, "Полный")
+        
+        return workbook
+    
+    def get_brief_worksheet(self, workbook: Workbook) -> Worksheet:
+        """Get brief worksheet from multi-sheet workbook."""
+        return workbook["Краткий"]
+    
+    def get_detailed_worksheet(self, workbook: Workbook) -> Worksheet:
+        """Get detailed worksheet from multi-sheet workbook."""
+        return workbook["Полный"] 

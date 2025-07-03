@@ -17,7 +17,7 @@ from datetime import datetime
 import logging
 
 from .styles import ExcelStyles, ColumnStyleConfig
-from .layout import WorksheetBuilder, ReportLayout
+from .layout import WorksheetBuilder, ReportLayout, MultiSheetBuilder, DetailedWorksheetBuilder
 from .formatter import ExcelDataFormatter, ExcelSummaryFormatter, DataValidator
 
 
@@ -46,6 +46,10 @@ class ExcelReportGenerator:
         # Настройки отступов (начинаем с B2 вместо A1)
         self.start_row = 2  # Отступ сверху
         self.start_col = 2  # Отступ слева (столбец B)
+        
+        # Новые компоненты для детального отчета - Фаза 4
+        self.multi_sheet_builder = MultiSheetBuilder()
+        self.detailed_builder = DetailedWorksheetBuilder()
     
     def create_report(self, data: List[Dict[str, Any]], output_path: str) -> str:
         """
@@ -390,6 +394,188 @@ class ExcelReportGenerator:
         
         return output_path
 
+    # ============================================================================
+    # НОВЫЕ МЕТОДЫ ДЛЯ ДЕТАЛЬНОГО ОТЧЕТА - ФАЗА 4: EXCEL ГЕНЕРАЦИЯ
+    # ============================================================================
+    
+    def create_detailed_report_sheet(
+        self, 
+        ws: Worksheet, 
+        detailed_data: List[Dict[str, Any]]
+    ) -> None:
+        """
+        Создает лист "Полный" с детальными данными товаров.
+        
+        Интегрируется с DataProcessor из Фазы 3 для отображения 
+        товаров по счетам с зебра-эффектом группировки.
+        
+        Args:
+            ws: Рабочий лист для детального отчета
+            detailed_data: Данные товаров из format_products_for_excel()
+        """
+        try:
+            self.logger.info(f"📋 Создание детального листа: {len(detailed_data)} товаров")
+            
+            # Записываем детальные данные с зебра-эффектом
+            self.detailed_builder.write_detailed_data(ws, detailed_data)
+            
+            # Добавляем итоги для детального отчета
+            summary_stats = self._calculate_detailed_summary(detailed_data)
+            self.detailed_builder.add_detailed_summary(ws, len(detailed_data), summary_stats)
+            
+            self.logger.info(f"✅ Детальный лист создан: {summary_stats.get('total_invoices', 0)} счетов")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка создания детального листа: {e}")
+            raise
+
+    def create_multi_sheet_report(
+        self, 
+        brief_data: List[Dict[str, Any]], 
+        detailed_data: List[Dict[str, Any]], 
+        output_path: str
+    ) -> str:
+        """
+        Создает двухлистовой Excel отчет: "Краткий" + "Полный".
+        
+        Использует MultiSheetBuilder для создания профессионального
+        отчета с двумя листами различного уровня детализации.
+        
+        Args:
+            brief_data: Данные для краткого отчета (счета)
+            detailed_data: Данные для детального отчета (товары)
+            output_path: Путь для сохранения файла
+            
+        Returns:
+            Путь к созданному двухлистовому отчету
+        """
+        try:
+            # Обеспечиваем правильное расширение
+            output_path = self._ensure_xlsx_extension(output_path)
+            
+            self.logger.info(f"📊 Создание двухлистового отчета: {len(brief_data)} счетов, {len(detailed_data)} товаров")
+            
+            # Создаем многолистовую книгу
+            wb = self.multi_sheet_builder.create_multi_sheet_workbook()
+            
+            # === ЛИСТ "КРАТКИЙ" ===
+            brief_ws = self.multi_sheet_builder.get_brief_worksheet(wb)
+            
+            # Используем существующие методы для краткого отчета
+            self._add_headers(brief_ws)
+            self._add_data_rows(brief_ws, brief_data)
+            self._apply_data_table_borders(brief_ws, len(brief_data))
+            self._add_summary_section_new_format(brief_ws, brief_data)
+            self._freeze_headers(brief_ws)
+            self._adjust_column_widths_auto(brief_ws, brief_data)
+            
+            # === ЛИСТ "ПОЛНЫЙ" ===
+            detailed_ws = self.multi_sheet_builder.get_detailed_worksheet(wb)
+            
+            # Создаем детальный лист с товарами
+            self.create_detailed_report_sheet(detailed_ws, detailed_data)
+            
+            # Сохраняем файл
+            wb.save(output_path)
+            
+            self.logger.info(f"✅ Двухлистовой Excel отчет создан: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка создания двухлистового отчета: {e}")
+            raise
+
+    def _calculate_detailed_summary(self, detailed_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Вычисляет итоговую статистику для детального отчета.
+        
+        Args:
+            detailed_data: Данные товаров
+            
+        Returns:
+            Словарь с итоговой статистикой
+        """
+        # Подсчитываем уникальные счета
+        unique_invoices = set()
+        total_amount = 0.0
+        
+        for item in detailed_data:
+            invoice_id = item.get('invoice_id')
+            if invoice_id:
+                unique_invoices.add(invoice_id)
+            
+            # Парсим сумму товара (удаляем пробелы и заменяем запятые)
+            total_str = item.get('total_amount', '0')
+            try:
+                # Удаляем пробелы и заменяем запятую на точку
+                clean_total = str(total_str).replace(' ', '').replace(',', '.')
+                total_amount += float(clean_total)
+            except (ValueError, TypeError):
+                pass
+        
+        return {
+            'total_invoices': len(unique_invoices),
+            'total_products': len(detailed_data),
+            'total_amount': total_amount
+        }
+
+    def generate_comprehensive_report(
+        self, 
+        brief_data: List[Dict[str, Any]], 
+        product_data: Any,  # DetailedInvoiceData или processed data из DataProcessor
+        output_path: str
+    ) -> str:
+        """
+        Генерирует комплексный отчет с интеграцией всех фаз проекта.
+        
+        Объединяет:
+        - API данные из Фазы 2 (Bitrix24Client)
+        - Обработанные данные из Фазы 3 (DataProcessor)
+        - Excel генерацию из Фазы 4 (ExcelReportGenerator)
+        
+        Args:
+            brief_data: Краткие данные счетов
+            product_data: Детальные данные товаров (из DataProcessor)
+            output_path: Путь для сохранения
+            
+        Returns:
+            Путь к созданному комплексному отчету
+        """
+        try:
+            self.logger.info("🎯 Генерация комплексного отчета с интеграцией всех фаз")
+            
+            # Если product_data это результат из DataProcessor
+            if hasattr(product_data, 'format_products_for_excel'):
+                # Получаем данные в формате для Excel
+                detailed_data = product_data.format_products_for_excel()
+            elif isinstance(product_data, dict) and 'products' in product_data:
+                # Если это grouped_data из group_products_by_invoice
+                detailed_data = []
+                for invoice_id, invoice_data in product_data.items():
+                    for product in invoice_data.products:
+                        if product.is_valid:
+                            detailed_data.append({
+                                'invoice_number': invoice_data.account_number,
+                                'company_name': invoice_data.company_name or 'Не найдено',
+                                'inn': invoice_data.inn or 'Не найдено',
+                                'product_name': product.product_name,
+                                'quantity': product.formatted_quantity,
+                                'unit_measure': product.unit_measure,
+                                'price': product.formatted_price,
+                                'total_amount': product.formatted_total,
+                                'invoice_id': invoice_id
+                            })
+            else:
+                # Если это уже готовые данные для Excel
+                detailed_data = product_data
+            
+            # Создаем двухлистовой отчет
+            return self.create_multi_sheet_report(brief_data, detailed_data, output_path)
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка генерации комплексного отчета: {e}")
+            raise
+
 
 class ReportGenerationError(Exception):
     """Custom exception for report generation errors."""
@@ -494,4 +680,60 @@ class ExcelReportBuilder:
                 results['errors'].append(f"Record {i + 1}: {str(e)}")
                 results['is_valid'] = False
         
-        return results 
+        return results
+    
+    # ============================================================================
+    # НОВЫЕ МЕТОДЫ BUILDER ДЛЯ ДЕТАЛЬНОГО ОТЧЕТА - ФАЗА 4
+    # ============================================================================
+    
+    def build_detailed_report(
+        self, 
+        brief_data: List[Dict[str, Any]], 
+        detailed_data: List[Dict[str, Any]], 
+        output_path: str
+    ) -> str:
+        """
+        Создает детальный двухлистовой отчет.
+        
+        Args:
+            brief_data: Данные для краткого отчета
+            detailed_data: Данные для детального отчета
+            output_path: Путь сохранения
+            
+        Returns:
+            Путь к созданному отчету
+        """
+        try:
+            return self.generator.create_multi_sheet_report(
+                brief_data=brief_data,
+                detailed_data=detailed_data,
+                output_path=output_path
+            )
+        except Exception as e:
+            raise ReportGenerationError(f"Failed to generate detailed report: {e}")
+    
+    def build_comprehensive_report(
+        self, 
+        brief_data: List[Dict[str, Any]], 
+        product_data: Any, 
+        output_path: str
+    ) -> str:
+        """
+        Создает комплексный отчет с интеграцией всех фаз.
+        
+        Args:
+            brief_data: Краткие данные счетов
+            product_data: Данные товаров (из DataProcessor)
+            output_path: Путь сохранения
+            
+        Returns:
+            Путь к созданному отчету
+        """
+        try:
+            return self.generator.generate_comprehensive_report(
+                brief_data=brief_data,
+                product_data=product_data,
+                output_path=output_path
+            )
+        except Exception as e:
+            raise ReportGenerationError(f"Failed to generate comprehensive report: {e}") 

@@ -222,16 +222,16 @@ class ExcelReportGenerator:
         if not data:
             return
         
-        # Вычисляем итоги
-        total_amount = sum(record.get('amount_numeric', 0) or 0 for record in data)
-        total_vat = sum(record.get('vat_amount_numeric', 0) or 0 for record in data)
+        # 🔧 ИСПРАВЛЕНИЕ: Используем правильные поля из process_invoice_record (amount, vat_amount)
+        total_amount = sum(self._parse_amount(record.get('amount', 0)) for record in data)
+        total_vat = sum(self._parse_amount(record.get('vat_amount', 0)) for record in data)
         
-        # Вычисляем счета с НДС и без НДС
-        no_vat_records = [r for r in data if r.get('is_no_vat', False)]
-        with_vat_records = [r for r in data if not r.get('is_no_vat', False)]
+        # Вычисляем счета с НДС и без НДС (по vat_amount)
+        no_vat_records = [r for r in data if self._parse_amount(r.get('vat_amount', 0)) == 0]
+        with_vat_records = [r for r in data if self._parse_amount(r.get('vat_amount', 0)) > 0]
         
-        no_vat_amount = sum(record.get('amount_numeric', 0) or 0 for record in no_vat_records)
-        with_vat_amount = sum(record.get('amount_numeric', 0) or 0 for record in with_vat_records)
+        no_vat_amount = sum(self._parse_amount(record.get('amount', 0)) for record in no_vat_records)
+        with_vat_amount = sum(self._parse_amount(record.get('amount', 0)) for record in with_vat_records)
         
         # 2. Позиция для итогов (строка после данных + 1 пустая строка вместо 2)
         summary_start_row = self.start_row + len(data) + 2

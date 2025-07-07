@@ -293,25 +293,25 @@ class DetailedReportLayout:
     Интегрируется с DataProcessor из Фазы 3 для обработки данных товаров.
     """
     
-    # Column definitions for detailed report (8 columns)
+    # 🔧 ИСПРАВЛЕНИЕ: Обновленные определения колонок для детального отчета
     COLUMNS = [
         ColumnDefinition(
-            header="Номер счёта",
+            header="Номер",  # Изменено с "Номер счёта"
             width=18.0,
             alignment="center",
             data_key="invoice_number"
         ),
         ColumnDefinition(
-            header="Контрагент", 
-            width=25.0,
-            alignment="left",
-            data_key="company_name"
-        ),
-        ColumnDefinition(
-            header="ИНН",
+            header="ИНН",  # Поменяны местами с "Контрагент"
             width=15.0,
             alignment="center",
             data_key="inn"
+        ),
+        ColumnDefinition(
+            header="Контрагент",  # Поменяны местами с "ИНН"
+            width=25.0,
+            alignment="left", 
+            data_key="company_name"
         ),
         ColumnDefinition(
             header="Наименование товара",
@@ -322,7 +322,7 @@ class DetailedReportLayout:
         ColumnDefinition(
             header="Кол-во",
             width=12.0,
-            alignment="right",
+            alignment="center",  # Изменено с "right" на "center"
             data_key="quantity"
         ),
         ColumnDefinition(
@@ -360,24 +360,32 @@ class DetailedReportLayout:
         """
         Set up detailed worksheet with proper structure and styling.
         
-        Применяет зеленые заголовки, заморозку панелей и границы
-        как в Hello World Excel Test из Фазы 0.
+        🔧 ИСПРАВЛЕНИЯ:
+        - Столбец A узкий (как высота строки)
+        - Убрана заморозка столбцов (только строка заголовков)
+        - Автоширина для всех столбцов
         
         Args:
             ws: OpenPyXL worksheet object
         """
         from openpyxl.styles import PatternFill, Border, Side, Alignment
+        from openpyxl.utils import get_column_letter
         
-        # Set column widths
+        # 🔧 ИСПРАВЛЕНИЕ 1: Столбец A узкий (как высота строки)
+        ws.column_dimensions['A'].width = 3  # Узкий столбец A
+        
+        # 🔧 ИСПРАВЛЕНИЕ 2: Автоширина для всех колонок данных
+        # Временно устанавливаем базовые ширины, затем будет автоподбор
         for i, col_def in enumerate(self.COLUMNS, start=self.START_COLUMN):
-            col_letter = ws.cell(row=1, column=i).column_letter
+            col_letter = get_column_letter(i)
             ws.column_dimensions[col_letter].width = col_def.width
         
         # Set row heights
         ws.row_dimensions[self.HEADER_ROW].height = 22  # Slightly taller for detailed headers
         
-        # Freeze panes at first data row
-        freeze_cell = ws.cell(row=self.DATA_START_ROW, column=self.START_COLUMN)
+        # 🔧 ИСПРАВЛЕНИЕ 3: Заморозка ТОЛЬКО строки заголовков (без столбцов)
+        # Заморозка на A3 означает что заморожены строки 1-2, но столбцы свободны
+        freeze_cell = f"A{self.DATA_START_ROW}"
         ws.freeze_panes = freeze_cell
         
         # Apply header styling (green background)
@@ -566,6 +574,9 @@ class DetailedWorksheetBuilder:
         
         # 🔧 УНИФИКАЦИЯ: Применяем жирные границы вокруг таблицы как в кратком отчете
         self._apply_detailed_table_borders(ws, len(data_rows))
+        
+        # 🔧 ИСПРАВЛЕНИЕ: Автоподбор ширины столбцов после записи данных
+        self._adjust_detailed_column_widths(ws, data_rows)
     
     def _get_detailed_column_number_format(self, col_idx: int) -> str:
         """
@@ -582,20 +593,22 @@ class DetailedWorksheetBuilder:
         Returns:
             Строка формата числа для Excel
         """
-        # Соответствие столбцов детального отчета:
-        # 0: Номер счёта (текст)
-        # 1: Контрагент (текст) 
-        # 2: ИНН (число)
+        # 🔧 ИСПРАВЛЕНИЕ: Обновленное соответствие столбцов детального отчета:
+        # 0: Номер (текст)
+        # 1: ИНН (число) - поменялись местами с Контрагент
+        # 2: Контрагент (текст) - поменялись местами с ИНН
         # 3: Наименование товара (текст)
-        # 4: Кол-во (число с 3 знаками)
+        # 4: Кол-во (ЦЕЛОЕ число) - требование пользователя
         # 5: Ед. изм. (текст)
         # 6: Цена (число с 2 знаками)
         # 7: Сумма (число с 2 знаками)
         
-        if col_idx == 2:  # ИНН
+        if col_idx == 1:  # ИНН (теперь второй столбец)
             return '0'  # Целое число без разделителей (как в кратком отчете)
-        elif col_idx in [4, 6, 7]:  # Кол-во, Цена, Сумма
-                         return '#,##0.00'  # Число с разделителями тысяч и 2 знака после запятой
+        elif col_idx == 4:  # Кол-во - ЦЕЛЫЕ числа (без дробной части)
+            return '0'  # Целое число без дробной части
+        elif col_idx in [6, 7]:  # Цена, Сумма
+            return '#,##0.00'  # Число с разделителями тысяч и 2 знака после запятой
         else:
             return 'General'  # Обычный формат для остальных
     
@@ -660,6 +673,70 @@ class DetailedWorksheetBuilder:
             invoices_row = summary_start_row + 1
             ws.cell(row=invoices_row, column=self.layout.START_COLUMN).value = "Всего счетов:"
             ws.cell(row=invoices_row, column=self.layout.START_COLUMN + 1).value = summary_stats['total_invoices']
+    
+    def _adjust_detailed_column_widths(self, ws: Worksheet, data_rows: List[Dict[str, Any]]) -> None:
+        """
+        🔧 ИСПРАВЛЕНИЕ: Автоподбор ширины столбцов для детального отчета
+        
+        Анализирует фактические данные и устанавливает оптимальную ширину
+        для всех столбцов (как требовал пользователь).
+        
+        Args:
+            ws: Рабочий лист
+            data_rows: Список строк данных для анализа
+        """
+        from openpyxl.utils import get_column_letter
+        
+        if not data_rows:
+            return
+        
+        # Анализируем длину данных в каждом столбце
+        max_lengths = {}
+        
+        for col_idx, col_def in enumerate(self.layout.COLUMNS):
+            data_key = col_def.data_key
+            header_length = len(col_def.header)
+            
+            # Находим максимальную длину для этого столбца
+            max_data_length = 0
+            for row in data_rows:
+                value = str(row.get(data_key, ""))
+                max_data_length = max(max_data_length, len(value))
+            
+            # Учитываем и заголовок, и данные + небольшой отступ
+            optimal_width = max(header_length, max_data_length) + 2
+            
+            # Применяем ограничения по типу столбца
+            if data_key == "inn":
+                optimal_width = max(optimal_width, 12)  # Минимум для ИНН
+                optimal_width = min(optimal_width, 20)  # Максимум для ИНН
+            elif data_key == "company_name":
+                optimal_width = max(optimal_width, 20)  # Минимум для контрагента
+                optimal_width = min(optimal_width, 50)  # Максимум для контрагента
+            elif data_key == "product_name":
+                optimal_width = max(optimal_width, 25)  # Минимум для товара
+                optimal_width = min(optimal_width, 60)  # Максимум для товара
+            elif data_key in ["price", "total_amount"]:
+                optimal_width = max(optimal_width, 15)  # Минимум для денежных полей
+                optimal_width = min(optimal_width, 25)  # Максимум для денежных полей
+            else:
+                optimal_width = min(optimal_width, 30)  # Общий максимум
+            
+            max_lengths[col_idx] = optimal_width
+        
+        # Применяем вычисленные ширины
+        for col_idx, optimal_width in max_lengths.items():
+            excel_col = self.layout.START_COLUMN + col_idx
+            col_letter = get_column_letter(excel_col)
+            ws.column_dimensions[col_letter].width = optimal_width
+        
+        # Логирование результатов
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"📏 Автоподбор ширины столбцов детального отчета:")
+        for col_idx, optimal_width in max_lengths.items():
+            col_name = self.layout.COLUMNS[col_idx].header
+            logger.info(f"   {col_name}: {optimal_width}")
 
 
 class MultiSheetBuilder:

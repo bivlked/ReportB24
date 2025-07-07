@@ -557,69 +557,26 @@ class Bitrix24Client:
         
         all_products = {}
         
-        # Обрабатываем по chunks для соблюдения лимитов Bitrix24
-        for i in range(0, len(invoice_ids), chunk_size):
-            chunk_ids = invoice_ids[i:i + chunk_size]
-            
+        # 🔧 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Метод crm.item.productrow.list НЕ ПОДДЕРЖИВАЕТСЯ в batch API
+        # Согласно тестированию, этот метод возвращает пустые результаты в batch запросах
+        # Используем ТОЛЬКО индивидуальные запросы для надежности
+        
+        logger.info(f"Using individual requests for {len(invoice_ids)} invoices (batch API not supported for productrow.list)")
+        
+        # Обрабатываем каждый счет индивидуально
+        for invoice_id in invoice_ids:
             try:
-                # Строим batch запрос для chunk
-                batch_data = {}
-                for j, invoice_id in enumerate(chunk_ids):
-                    batch_data[f'products_invoice_{invoice_id}'] = {
-                        'method': 'crm.item.productrow.list',
-                        'params': {
-                            'filter': {
-                                '=ownerType': 'SI',
-                                '=ownerId': invoice_id
-                            }
-                        }
-                    }
-                
-                logger.debug(f"Batch request for {len(chunk_ids)} invoices (chunk {i//chunk_size + 1})")
-                
-                # Отправляем batch запрос
-                batch_response = self._make_request('POST', 'batch', data={'cmd': batch_data})
-                
-                if batch_response and batch_response.success:
-                    batch_results = batch_response.data.get('result', {}) if isinstance(batch_response.data, dict) else {}
-                    
-                    # Обрабатываем результаты batch
-                    for key, result in batch_results.items():
-                        # Извлекаем invoice_id из ключа: products_invoice_123 -> 123
-                        try:
-                            invoice_id = int(key.split('_')[-1])
-                        except (ValueError, IndexError):
-                            logger.warning(f"Cannot parse invoice_id from batch key: {key}")
-                            continue
-                        
-                        # Извлекаем товары из результата
-                        if isinstance(result, dict) and 'productRows' in result:
-                            products = result['productRows']
-                        elif isinstance(result, list):
-                            products = result
-                        else:
-                            products = []
-                        
-                        all_products[invoice_id] = products
-                        logger.debug(f"Invoice {invoice_id}: {len(products)} products")
-                        
-                else:
-                    logger.warning(f"Batch request failed for chunk {i//chunk_size + 1}: {batch_response.error if batch_response else 'Unknown error'}")
-                    
-                    # Fallback: sequential requests for this chunk
-                    logger.info(f"Falling back to sequential requests for chunk {i//chunk_size + 1}")
-                    for invoice_id in chunk_ids:
-                        all_products[invoice_id] = self.get_products_by_invoice(invoice_id)
-                
+                products = self.get_products_by_invoice(invoice_id)
+                all_products[invoice_id] = products
+                if products:
+                    logger.debug(f"Invoice {invoice_id}: {len(products)} products")
             except Exception as e:
-                logger.error(f"Error in batch request for chunk {i//chunk_size + 1}: {e}")
-                
-                # Fallback: sequential requests
-                for invoice_id in chunk_ids:
-                    all_products[invoice_id] = self.get_products_by_invoice(invoice_id)
+                logger.error(f"Error getting products for invoice {invoice_id}: {e}")
+                all_products[invoice_id] = []
+
         
         total_products = sum(len(products) for products in all_products.values())
-        logger.info(f"Batch processing complete: {len(all_products)} invoices, {total_products} total products")
+        logger.info(f"Individual processing complete: {len(all_products)} invoices, {total_products} total products")
         
         return all_products
     

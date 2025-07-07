@@ -134,7 +134,7 @@ def main():
                                 'company_name': company_name if company_name not in ["Не найдено", "Ошибка"] else 'Не найдено',
                                 'inn': inn if inn not in ["Не найдено", "Ошибка"] else 'Не найдено',
                                 'product_name': product.get('productName', 'Товар без названия'),
-                                'quantity': f"{float(product.get('quantity', 0)):,.3f}".replace(',', ' ').replace('.', ','),
+                                'quantity': f"{int(float(product.get('quantity', 0)))}",  # Целые числа без дробной части
                                 'unit_measure': product.get('measureName', 'шт'),
                                 'price': f"{float(product.get('price', 0)):,.2f}".replace(',', ' ').replace('.', ','),
                                 'total_amount': f"{float(product.get('price', 0)) * float(product.get('quantity', 0)):,.2f}".replace(',', ' ').replace('.', ','),

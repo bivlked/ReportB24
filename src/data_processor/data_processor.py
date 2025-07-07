@@ -141,18 +141,24 @@ class DataProcessor:
         """
         try:
             # Извлекаем данные из Smart Invoice структуры
+            tax_val = float(raw_data.get('taxValue', 0))
+            tax_text = 'нет' if tax_val == 0 else self._format_amount(tax_val)
+            
             return {
                 'account_number': raw_data.get('accountNumber', ''),
                 'inn': self._extract_smart_invoice_inn(raw_data),
                 'counterparty': self._extract_smart_invoice_counterparty(raw_data),
                 'amount': self._format_amount(raw_data.get('opportunity', 0)),
-                'vat_amount': self._format_amount(raw_data.get('taxValue', 0)),
-                'vat_text': 'нет' if float(raw_data.get('taxValue', 0)) == 0 else self._format_amount(raw_data.get('taxValue', 0)),
+                'vat_amount': tax_text,  # 🔧 ИСПРАВЛЕНИЕ: Используем текст "нет" для НДС как в workflow
                 'invoice_date': self._format_date(raw_data.get('begindate')),
                 'shipping_date': self._format_date(raw_data.get('UFCRM_SMART_INVOICE_1651168135187')),
                 'payment_date': self._format_date(raw_data.get('UFCRM_626D6ABE98692')),
                 'is_unpaid': not bool(raw_data.get('UFCRM_626D6ABE98692')),  # нет даты оплаты = неоплачен
-                'stage_id': raw_data.get('stageId', '')
+                'is_no_vat': tax_text == "нет",  # 🔧 ИСПРАВЛЕНИЕ: Флаг для серой заливки
+                'stage_id': raw_data.get('stageId', ''),
+                # Дополнительные поля для расчета итогов
+                'amount_numeric': float(raw_data.get('opportunity', 0)),
+                'vat_amount_numeric': tax_val
             }
         except Exception as e:
             logger.error(f"Ошибка обработки Smart Invoice: {e}")

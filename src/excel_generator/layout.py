@@ -380,8 +380,8 @@ class DetailedReportLayout:
             col_letter = get_column_letter(i)
             ws.column_dimensions[col_letter].width = col_def.width
         
-        # Set row heights
-        ws.row_dimensions[self.HEADER_ROW].height = 22  # Slightly taller for detailed headers
+        # 🔧 ИСПРАВЛЕНИЕ: Унифицируем высоту строки заголовков между листами
+        ws.row_dimensions[self.HEADER_ROW].height = 18  # Одинаковая высота с листом "Краткий"
         
         # 🔧 ИСПРАВЛЕНИЕ 3: Заморозка ТОЛЬКО строки заголовков (без столбцов)
         # Заморозка на A3 означает что заморожены строки 1-2, но столбцы свободны

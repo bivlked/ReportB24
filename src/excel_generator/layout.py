@@ -399,6 +399,10 @@ class DetailedReportLayout:
             header_cell.fill = header_fill
             header_cell.border = border_style
             header_cell.alignment = Alignment(horizontal="center", vertical="center")
+            
+            # 🔧 УНИФИКАЦИЯ: Применяем тот же стиль шрифта как в кратком отчете
+            from openpyxl.styles import Font
+            header_cell.font = Font(bold=True, color="000000")  # Жирный черный текст
     
     def write_headers(self, ws: Worksheet) -> None:
         """
@@ -551,11 +555,84 @@ class DetailedWorksheetBuilder:
                 # Apply alignment
                 cell.alignment = Alignment(horizontal=col_def.alignment, vertical="center")
                 
+                # 🔧 УНИФИКАЦИЯ: Применяем числовое форматирование как в кратком отчете
+                cell.number_format = self._get_detailed_column_number_format(col_idx)
+                
                 # Apply border
                 cell.border = border_style
         
         # Apply zebra effect after writing all data
         self.layout.apply_zebra_effect(ws, data_rows)
+        
+        # 🔧 УНИФИКАЦИЯ: Применяем жирные границы вокруг таблицы как в кратком отчете
+        self._apply_detailed_table_borders(ws, len(data_rows))
+    
+    def _get_detailed_column_number_format(self, col_idx: int) -> str:
+        """
+        🔧 УНИФИКАЦИЯ: Числовое форматирование для детального отчета
+        
+        Применяет такое же форматирование как в кратком отчете:
+        - ИНН (индекс 2): '0' - целое число
+        - Кол-во, Цена, Сумма (индексы 4, 6, 7): '#,##0.00' - числа с разделителями
+        - Остальные: 'General' - обычный формат
+        
+        Args:
+            col_idx: Индекс столбца (0-based)
+            
+        Returns:
+            Строка формата числа для Excel
+        """
+        # Соответствие столбцов детального отчета:
+        # 0: Номер счёта (текст)
+        # 1: Контрагент (текст) 
+        # 2: ИНН (число)
+        # 3: Наименование товара (текст)
+        # 4: Кол-во (число с 3 знаками)
+        # 5: Ед. изм. (текст)
+        # 6: Цена (число с 2 знаками)
+        # 7: Сумма (число с 2 знаками)
+        
+        if col_idx == 2:  # ИНН
+            return '0'  # Целое число без разделителей (как в кратком отчете)
+        elif col_idx in [4, 6, 7]:  # Кол-во, Цена, Сумма
+                         return '#,##0.00'  # Число с разделителями тысяч и 2 знака после запятой
+        else:
+            return 'General'  # Обычный формат для остальных
+    
+    def _apply_detailed_table_borders(self, ws: Worksheet, data_rows: int) -> None:
+        """
+        🔧 УНИФИКАЦИЯ: Применяет жирную рамку вокруг таблицы детального отчета
+        
+        Точно такая же логика как в _apply_data_table_borders() краткого отчета.
+        
+        Args:
+            ws: Рабочий лист
+            data_rows: Количество строк данных
+        """
+        from openpyxl.styles import Border, Side
+        
+        thick_border = Side(border_style="thick", color="000000")
+        
+        # Рамка заканчивается ПОСЛЕ последней строки данных
+        last_data_row = self.layout.DATA_START_ROW + data_rows - 1  # заголовки + данные  
+        last_col = self.layout.START_COLUMN + self.layout.total_columns - 1  # последний столбец
+        
+        # Жирная граница только вокруг таблицы с данными (БЕЗ итогов)
+        for row in range(self.layout.HEADER_ROW, last_data_row + 1):
+            for col in range(self.layout.START_COLUMN, last_col + 1):
+                cell = ws.cell(row=row, column=col)
+                
+                border_left = thick_border if col == self.layout.START_COLUMN else cell.border.left
+                border_right = thick_border if col == last_col else cell.border.right  
+                border_top = thick_border if row == self.layout.HEADER_ROW else cell.border.top
+                border_bottom = thick_border if row == last_data_row else cell.border.bottom
+                
+                cell.border = Border(
+                    left=border_left,
+                    right=border_right,
+                    top=border_top,
+                    bottom=border_bottom
+                )
     
     def add_detailed_summary(
         self, 

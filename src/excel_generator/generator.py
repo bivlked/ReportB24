@@ -419,11 +419,11 @@ class ExcelReportGenerator:
             # Записываем детальные данные с зебра-эффектом
             self.detailed_builder.write_detailed_data(ws, detailed_data)
             
-            # Добавляем итоги для детального отчета
-            summary_stats = self._calculate_detailed_summary(detailed_data)
-            self.detailed_builder.add_detailed_summary(ws, len(detailed_data), summary_stats)
+            # 🔧 ИСПРАВЛЕНИЕ: Убираем итоги с листа "Полный" согласно требованию пользователя
+            # summary_stats = self._calculate_detailed_summary(detailed_data)
+            # self.detailed_builder.add_detailed_summary(ws, len(detailed_data), summary_stats)
             
-            self.logger.info(f"✅ Детальный лист создан: {summary_stats.get('total_invoices', 0)} счетов")
+            self.logger.info(f"✅ Детальный лист создан: {len(detailed_data)} товаров (без итогов)")
             
         except Exception as e:
             self.logger.error(f"❌ Ошибка создания детального листа: {e}")
@@ -438,8 +438,8 @@ class ExcelReportGenerator:
         """
         Создает двухлистовой Excel отчет: "Краткий" + "Полный".
         
-        Использует MultiSheetBuilder для создания профессионального
-        отчета с двумя листами различного уровня детализации.
+        🔧 ИСПРАВЛЕНИЕ: Лист "Краткий" создается ТОЧНО ТАКИМ ЖЕ как однолистовой отчет.
+        Используется стандартное форматирование ExcelReportGenerator для совместимости.
         
         Args:
             brief_data: Данные для краткого отчета (счета)
@@ -455,22 +455,23 @@ class ExcelReportGenerator:
             
             self.logger.info(f"📊 Создание двухлистового отчета: {len(brief_data)} счетов, {len(detailed_data)} товаров")
             
-            # Создаем многолистовую книгу
-            wb = self.multi_sheet_builder.create_multi_sheet_workbook()
+            # Создаем пустую книгу (НЕ используем MultiSheetBuilder для избежания конфликтов)
+            wb = Workbook()
             
-            # === ЛИСТ "КРАТКИЙ" ===
-            brief_ws = self.multi_sheet_builder.get_brief_worksheet(wb)
+            # === ЛИСТ "КРАТКИЙ" - ТОЧНО КАК В ОДНОЛИСТОВОМ ===
+            brief_ws = wb.active
+            brief_ws.title = "Краткий"
             
-            # Используем существующие методы для краткого отчета
-            self._add_headers(brief_ws)
+            # Используем ВСЕ стандартные методы из create_report() для полной совместимости
+            self._add_headers(brief_ws)  # ✅ Оранжевые заголовки как в однолистовом
             self._add_data_rows(brief_ws, brief_data)
             self._apply_data_table_borders(brief_ws, len(brief_data))
-            self._add_summary_section_new_format(brief_ws, brief_data)
+            self._add_summary_section_new_format(brief_ws, brief_data)  # ✅ Итоги с красным НДС
             self._freeze_headers(brief_ws)
             self._adjust_column_widths_auto(brief_ws, brief_data)
             
-            # === ЛИСТ "ПОЛНЫЙ" ===
-            detailed_ws = self.multi_sheet_builder.get_detailed_worksheet(wb)
+            # === ЛИСТ "ПОЛНЫЙ" - ИСПОЛЬЗУЕМ ДЕТАЛЬНЫЙ BUILDER ===
+            detailed_ws = self.detailed_builder.create_detailed_worksheet(wb, "Полный")
             
             # Создаем детальный лист с товарами
             self.create_detailed_report_sheet(detailed_ws, detailed_data)
@@ -479,6 +480,8 @@ class ExcelReportGenerator:
             wb.save(output_path)
             
             self.logger.info(f"✅ Двухлистовой Excel отчет создан: {output_path}")
+            self.logger.info(f"🎨 Лист 'Краткий': оранжевые заголовки, итоги с красным НДС (как в однолистовом)")
+            self.logger.info(f"🎨 Лист 'Полный': зеленые заголовки, зебра-группировка товаров")
             return output_path
             
         except Exception as e:

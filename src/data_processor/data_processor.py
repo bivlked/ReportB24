@@ -109,13 +109,25 @@ class DataProcessor:
     - CurrencyProcessor: Обработка валют и расчёт НДС
     """
     
-    def __init__(self, default_currency: str = 'RUB'):
+    def __init__(self, default_currency: str = 'RUB', bitrix_client=None):
         """Инициализация главного процессора"""
         self.inn_processor = INNProcessor()
         self.date_processor = DateProcessor()
         self.currency_processor = CurrencyProcessor(default_currency)
         
         self.default_currency = default_currency
+        
+        # 🔧 ИСПРАВЛЕНИЕ: Поддержка Bitrix24Client для получения реквизитов
+        self._bitrix_client = bitrix_client
+    
+    def set_bitrix_client(self, bitrix_client):
+        """
+        Устанавливает Bitrix24Client для получения реквизитов
+        
+        Args:
+            bitrix_client: Экземпляр Bitrix24Client
+        """
+        self._bitrix_client = bitrix_client
     
     def process_invoice_record(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -147,13 +159,35 @@ class DataProcessor:
             return None
     
     def _extract_smart_invoice_inn(self, raw_data: Dict[str, Any]) -> str:
-        """Извлечение ИНН для Smart Invoice (будет дополнено через реквизиты)"""
-        # Пока возвращаем пустую строку, ИНН будет получен через реквизиты
+        """
+        🔧 ИСПРАВЛЕНИЕ: Извлечение ИНН для Smart Invoice через реквизиты
+        
+        Для получения ИНН используется номер счета (accountNumber) 
+        и метод get_company_info_by_invoice() из Bitrix24Client
+        """
+        account_number = raw_data.get('accountNumber', '')
+        if account_number and hasattr(self, '_bitrix_client'):
+            try:
+                company_name, inn = self._bitrix_client.get_company_info_by_invoice(account_number)
+                return inn if inn not in ["Не найдено", "Ошибка", "Нет реквизитов", "Некорректный реквизит", "Ошибка реквизита"] else ""
+            except Exception as e:
+                logger.warning(f"Ошибка получения ИНН для счета {account_number}: {e}")
         return ""
     
     def _extract_smart_invoice_counterparty(self, raw_data: Dict[str, Any]) -> str:
-        """Извлечение названия контрагента для Smart Invoice"""
-        # Пока возвращаем пустую строку, название будет получено через реквизиты
+        """
+        🔧 ИСПРАВЛЕНИЕ: Извлечение названия контрагента для Smart Invoice через реквизиты
+        
+        Для получения названия контрагента используется номер счета (accountNumber) 
+        и метод get_company_info_by_invoice() из Bitrix24Client
+        """
+        account_number = raw_data.get('accountNumber', '')
+        if account_number and hasattr(self, '_bitrix_client'):
+            try:
+                company_name, inn = self._bitrix_client.get_company_info_by_invoice(account_number)
+                return company_name if company_name not in ["Не найдено", "Ошибка", "Нет реквизитов", "Некорректный реквизит", "Ошибка реквизита"] else ""
+            except Exception as e:
+                logger.warning(f"Ошибка получения контрагента для счета {account_number}: {e}")
         return ""
     
     def _format_amount(self, amount) -> str:

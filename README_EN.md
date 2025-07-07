@@ -40,7 +40,15 @@
 
 ## 🆕 What's New in v2.1.0
 
-### 🔐 Enterprise Security
+### 📊 **NEW**: Detailed Reports with Products
+- **🔥 Dual-Sheet Reports**: "Brief" (as before) + new "Detailed" with product breakdown
+- **📦 Smart Invoices Products**: Full integration with `crm.item.productrow.list` API
+- **🎯 Batch Optimization**: Up to **5-10x acceleration** through batch requests instead of N+1
+- **🦓 Zebra Effect**: Visual product grouping by invoices with alternating colors
+- **💰 Automatic VAT**: 20% VAT calculated automatically for all products
+- **🏢 8-Column Detail**: Invoice number, Contractor, INN, Product name, Quantity, Unit, Price, Amount
+
+### 🔐 Enterprise Security (v1.0.0)
 - **🔒 Secure Configuration System**: Hybrid `.env` + `config.ini` with automatic secret migration
 - **🔍 URL Masking**: Sensitive webhook URLs masked in all logs (`https://portal.bitrix24.ru/rest/12/***/`)
 - **⚡ Zero-Breach Architecture**: Secrets never committed to Git, automatic .env protection

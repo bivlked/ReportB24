@@ -488,18 +488,28 @@ class DataProcessor:
             product.total_amount = product.price * product.quantity
             product.formatted_total = f"{float(product.total_amount):,.2f}".replace(',', ' ').replace('.', ',')
             
-            # Расчет НДС (предполагаем 20%)
-            vat_result = self.currency_processor.calculate_vat(
-                product.total_amount, '20%', amount_includes_vat=True
-            )
-            if vat_result.is_valid:
-                product.vat_amount = vat_result.vat_amount
-                product.vat_rate = "20%"
-                product.formatted_vat = f"{float(product.vat_amount):,.2f}".replace(',', ' ').replace('.', ',')
+            # Расчет НДС на основе данных API
+            tax_rate = raw_product.get('taxRate', 0)
+            tax_included = raw_product.get('taxIncluded', 'N') == 'Y'
+            
+            if tax_rate and tax_rate > 0:
+                # Используем ставку НДС из API
+                vat_result = self.currency_processor.calculate_vat(
+                    product.total_amount, f'{tax_rate}%', amount_includes_vat=tax_included
+                )
+                if vat_result.is_valid:
+                    product.vat_amount = vat_result.vat_amount
+                    product.vat_rate = f"{tax_rate}%"
+                    product.formatted_vat = f"{float(product.vat_amount):,.2f}".replace(',', ' ').replace('.', ',')
+                else:
+                    product.vat_amount = Decimal('0')
+                    product.vat_rate = "0%"
+                    product.formatted_vat = "нет"
             else:
+                # Товар без НДС
                 product.vat_amount = Decimal('0')
                 product.vat_rate = "0%"
-                product.formatted_vat = "0,00"
+                product.formatted_vat = "нет"
             
             # Валидация товара
             product.is_valid = bool(

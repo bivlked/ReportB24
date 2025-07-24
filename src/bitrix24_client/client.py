@@ -1,6 +1,6 @@
 """
 Основной клиент для работы с Bitrix24 REST API.
-Включает адаптивное rate limiting и обработку ошибок.
+Включает адаптивное rate limiting, кэширование и обработку ошибок.
 """
 import requests
 import logging
@@ -19,6 +19,7 @@ from .exceptions import (
     NotFoundError,
     TimeoutError as APITimeoutError,
 )
+from .api_cache import get_cache
 
 logger = logging.getLogger(__name__)
 
@@ -384,7 +385,7 @@ class Bitrix24Client:
     
     def get_requisite_links(self, entity_type_id: int, entity_id: int) -> List[Dict[str, Any]]:
         """
-        Получение связей реквизитов для сущности (как в ShortReport.py)
+        Получение связей реквизитов для сущности с кэшированием (как в ShortReport.py)
         
         Args:
             entity_type_id: Тип сущности (31 для Smart Invoices)
@@ -393,17 +394,30 @@ class Bitrix24Client:
         Returns:
             List[Dict]: Список связей реквизитов
         """
+        method = 'crm.requisite.link.list'
         params = {
             'filter[ENTITY_TYPE_ID]': entity_type_id,
             'filter[ENTITY_ID]': entity_id
         }
         
-        response = self._make_request('GET', 'crm.requisite.link.list', params=params)
-        return response.data if response.data else []
+        # Проверяем кэш
+        cache = get_cache()
+        cached_result = cache.get(method, params)
+        if cached_result is not None:
+            logger.debug(f"Cache hit for requisite links of entity {entity_id}")
+            return cached_result
+        
+        response = self._make_request('GET', method, params=params)
+        result = response.data if response.data else []
+        
+        # Сохраняем в кэш
+        cache.put(method, params, result)
+        
+        return result
     
     def get_requisite_details(self, requisite_id: int) -> Optional[Dict[str, Any]]:
         """
-        Получение деталей реквизита (как в ShortReport.py)
+        Получение деталей реквизита с кэшированием (как в ShortReport.py)
         
         Args:
             requisite_id: ID реквизита
@@ -411,10 +425,23 @@ class Bitrix24Client:
         Returns:
             Dict: Детали реквизита или None
         """
+        method = 'crm.requisite.get'
         data = {"id": str(requisite_id)}
         
-        response = self._make_request('POST', 'crm.requisite.get', data=data)
-        return response.data if response.data else None
+        # Проверяем кэш
+        cache = get_cache()
+        cached_result = cache.get(method, data)
+        if cached_result is not None:
+            logger.debug(f"Cache hit for requisite details {requisite_id}")
+            return cached_result
+        
+        response = self._make_request('POST', method, data=data)
+        result = response.data if response.data else None
+        
+        # Сохраняем в кэш
+        cache.put(method, data, result)
+        
+        return result
     
     def get_company_info_by_invoice(self, invoice_number: str) -> tuple:
         """
@@ -496,11 +523,13 @@ class Bitrix24Client:
 
     def get_products_by_invoice(self, invoice_id: int) -> List[Dict[str, Any]]:
         """
-        Получение товаров по ID счета через crm.item.productrow.list
+        Получение товаров по ID счета через crm.item.productrow.list с кэшированием
         
         На основе успешного Proof of Concept с правильными параметрами:
         - =ownerType: SI (Smart Invoice)
         - =ownerId: ID счета
+        
+        Использует APIDataCache для минимизации дублирующихся запросов.
         
         Args:
             invoice_id: ID Smart Invoice счета
@@ -509,6 +538,7 @@ class Bitrix24Client:
             List[Dict]: Список товаров счета
         """
         try:
+            method = 'crm.item.productrow.list'
             params = {
                 'filter': {
                     '=ownerType': 'SI',  # Smart Invoice (проверено в PoC)
@@ -516,12 +546,23 @@ class Bitrix24Client:
                 }
             }
             
-            logger.debug(f"Getting products for invoice {invoice_id}")
-            response = self._make_request('POST', 'crm.item.productrow.list', data=params)
+            # Проверяем кэш
+            cache = get_cache()
+            cached_result = cache.get(method, params)
+            if cached_result is not None:
+                logger.debug(f"Cache hit for products of invoice {invoice_id}")
+                return cached_result
+            
+            logger.debug(f"Getting products for invoice {invoice_id} (cache miss)")
+            response = self._make_request('POST', method, data=params)
             
             if response and response.success:
                 # Структура ответа проверена в PoC: result.productRows
                 products = response.data.get('productRows', []) if isinstance(response.data, dict) else []
+                
+                # Сохраняем в кэш
+                cache.put(method, params, products)
+                
                 logger.info(f"Retrieved {len(products)} products for invoice {invoice_id}")
                 return products
             else:

@@ -326,12 +326,6 @@ class DetailedReportLayout:
             data_key="quantity"
         ),
         ColumnDefinition(
-            header="Ед. изм.",
-            width=10.0,
-            alignment="center",
-            data_key="unit_measure"
-        ),
-        ColumnDefinition(
             header="Цена",
             width=15.0,
             alignment="right",
@@ -342,6 +336,12 @@ class DetailedReportLayout:
             width=18.0,
             alignment="right",
             data_key="total_amount"
+        ),
+        ColumnDefinition(
+            header="Сумма НДС",
+            width=15.0,
+            alignment="right",
+            data_key="vat_amount"
         ),
     ]
     
@@ -459,7 +459,76 @@ class DetailedReportLayout:
                 for col_idx in range(self.START_COLUMN, self.START_COLUMN + self.total_columns):
                     cell = ws.cell(row=excel_row, column=col_idx)
                     cell.fill = zebra_fill
+
+    def apply_invoice_separator_borders(self, ws: Worksheet, data_rows: List[Dict[str, Any]]) -> None:
+        """
+        Применение толстых нижних границ для разделения счетов.
+        
+        Согласно Creative Phase решению: "Thick Bottom Border для последней строки каждого счета"
+        обеспечивает максимальную визуальную ясность границ между счетами.
+        
+        Args:
+            ws: OpenPyXL worksheet object
+            data_rows: Список строк данных с метаданными группировки
+        """
+        from openpyxl.styles import Border, Side
+        
+        if not data_rows:
+            return
+        
+        # Создаем стиль для границы между счетами
+        thin_side = Side(border_style="thin", color="000000")
+        thick_side = Side(border_style="thick", color="000000")
+        
+        separator_border = Border(
+            left=thin_side,
+            right=thin_side,
+            top=thin_side,
+            bottom=thick_side  # Толстая нижняя граница
+        )
+        
+        current_invoice_id = None
+        last_invoice_row = None
+        
+        # Находим последнюю строку каждого счета
+        for row_idx, row_data in enumerate(data_rows):
+            invoice_id = row_data.get('invoice_id')
+            
+            # Если начался новый счет и у нас есть предыдущий - применяем границу
+            if invoice_id != current_invoice_id and last_invoice_row is not None:
+                self._apply_separator_border_to_row(ws, last_invoice_row, separator_border)
+            
+            # Обновляем отслеживание
+            if invoice_id != current_invoice_id:
+                current_invoice_id = invoice_id
+            
+            last_invoice_row = row_idx
+        
+        # Применяем границу к последней строке последнего счета
+        if last_invoice_row is not None:
+            self._apply_separator_border_to_row(ws, last_invoice_row, separator_border)
     
+    def _apply_separator_border_to_row(self, ws: Worksheet, row_idx: int, border: Border) -> None:
+        """
+        Применяет границу разделения к конкретной строке.
+        
+        Args:
+            ws: OpenPyXL worksheet object
+            row_idx: Индекс строки данных (0-based)
+            border: Стиль границы для применения
+        """
+        excel_row = self.DATA_START_ROW + row_idx
+        
+        # Применяем границу ко всем ячейкам строки
+        for col_idx in range(len(self.COLUMNS)):
+            excel_col = self.START_COLUMN + col_idx
+            cell = ws.cell(row=excel_row, column=excel_col)
+            
+            # Сохраняем существующую заливку, но заменяем границу
+            existing_fill = cell.fill
+            cell.border = border
+            cell.fill = existing_fill
+
     def get_data_cell_position(self, row_index: int, column_index: int) -> Tuple[int, int]:
         """
         Get Excel cell position for detailed data.
@@ -571,6 +640,9 @@ class DetailedWorksheetBuilder:
         
         # Apply zebra effect after writing all data
         self.layout.apply_zebra_effect(ws, data_rows)
+        
+        # Apply thick borders between invoices
+        self.layout.apply_invoice_separator_borders(ws, data_rows)
         
         # 🔧 УНИФИКАЦИЯ: Применяем жирные границы вокруг таблицы как в кратком отчете
         self._apply_detailed_table_borders(ws, len(data_rows))

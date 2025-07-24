@@ -639,12 +639,14 @@ class DataProcessor:
         
         for invoice_id, invoice_data in sorted_invoices:
             # Добавляем товары этого счета
+            is_first_product_in_invoice = True
             for product in invoice_data.products:
                 if product.is_valid:
                     excel_row = {
-                        'invoice_number': invoice_data.account_number,
-                        'company_name': invoice_data.company_name or 'Не найдено',
-                        'inn': invoice_data.inn or 'Не найдено',
+                        # Мета-поля заполняются только для первой строки каждого счета
+                        'invoice_number': invoice_data.account_number if is_first_product_in_invoice else '',
+                        'company_name': (invoice_data.company_name or 'Не найдено') if is_first_product_in_invoice else '',
+                        'inn': (invoice_data.inn or 'Не найдено') if is_first_product_in_invoice else '',
                         'product_name': product.product_name,
                         'quantity': product.formatted_quantity,
                         'unit_measure': product.unit_measure,
@@ -654,9 +656,10 @@ class DataProcessor:
                         
                         # Метаданные для группировки
                         'invoice_id': invoice_id,
-                        'is_first_product': len(excel_rows) == 0 or excel_rows[-1].get('invoice_id') != invoice_id
+                        'is_first_product': is_first_product_in_invoice
                     }
                     excel_rows.append(excel_row)
+                    is_first_product_in_invoice = False  # Следующие товары не первые
         
         logger.info(f"Excel форматирование завершено: {len(excel_rows)} строк товаров")
         return excel_rows

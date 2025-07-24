@@ -478,13 +478,13 @@ class DetailedReportLayout:
         
         # Создаем стиль для границы между счетами
         thin_side = Side(border_style="thin", color="000000")
-        thick_side = Side(border_style="thick", color="000000")
+        medium_side = Side(border_style="medium", color="000000")
         
         separator_border = Border(
             left=thin_side,
             right=thin_side,
             top=thin_side,
-            bottom=thick_side  # Толстая нижняя граница
+            bottom=medium_side  # Толстая нижняя граница
         )
         
         current_invoice_id = None
@@ -508,7 +508,7 @@ class DetailedReportLayout:
         if last_invoice_row is not None:
             self._apply_separator_border_to_row(ws, last_invoice_row, separator_border)
     
-    def _apply_separator_border_to_row(self, ws: Worksheet, row_idx: int, border: Border) -> None:
+    def _apply_separator_border_to_row(self, ws: 'Worksheet', row_idx: int, border) -> None:
         """
         Применяет границу разделения к конкретной строке.
         
@@ -524,10 +524,9 @@ class DetailedReportLayout:
             excel_col = self.START_COLUMN + col_idx
             cell = ws.cell(row=excel_row, column=excel_col)
             
-            # Сохраняем существующую заливку, но заменяем границу
-            existing_fill = cell.fill
+            # Просто применяем границу, не трогая заливку
+            # (заливка уже установлена ранее через zebra-стилизацию)
             cell.border = border
-            cell.fill = existing_fill
 
     def get_data_cell_position(self, row_index: int, column_index: int) -> Tuple[int, int]:
         """
@@ -788,7 +787,7 @@ class DetailedWorksheetBuilder:
             elif data_key == "product_name":
                 optimal_width = max(optimal_width, 25)  # Минимум для товара
                 optimal_width = min(optimal_width, 60)  # Максимум для товара
-            elif data_key in ["price", "total_amount"]:
+            elif data_key in ["price", "total_amount", "vat_amount"]:
                 optimal_width = max(optimal_width, 15)  # Минимум для денежных полей
                 optimal_width = min(optimal_width, 25)  # Максимум для денежных полей
             else:

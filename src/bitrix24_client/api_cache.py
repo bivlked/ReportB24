@@ -15,6 +15,8 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass
 import threading
 import time
+import hashlib
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,8 @@ class APIDataCache:
         self._product_cache: Dict[str, CacheEntry] = {}
         self._company_cache: Dict[str, CacheEntry] = {}
         self._invoice_cache: Dict[str, CacheEntry] = {}
+        # Общий кэш для произвольных запросов
+        self._general_cache: Dict[str, CacheEntry] = {}
         
         # Статистика
         self._hits = 0
@@ -214,6 +218,77 @@ class APIDataCache:
             
             logger.debug(f"Кэширован счет {invoice_id}")
     
+    def get(self, method: str, params: Dict[str, Any]) -> Optional[Any]:
+        """
+        Общий метод получения данных из кэша
+        
+        Args:
+            method: Название метода API
+            params: Параметры запроса
+            
+        Returns:
+            Any: Кэшированные данные или None если нет в кэше
+        """
+        cache_key = self._generate_cache_key(method, params)
+        
+        with self._lock:
+            entry = self._general_cache.get(cache_key)
+            
+            if entry and self._is_valid(entry):
+                # Cache HIT
+                entry.access_count += 1
+                entry.last_accessed = datetime.now()
+                self._hits += 1
+                
+                logger.debug(f"Cache HIT: {method} (ключ: {cache_key[:16]}...)")
+                return entry.data
+            
+            # Cache MISS
+            self._misses += 1
+            logger.debug(f"Cache MISS: {method} (ключ: {cache_key[:16]}...)")
+            return None
+    
+    def put(self, method: str, params: Dict[str, Any], data: Any) -> None:
+        """
+        Общий метод сохранения данных в кэш
+        
+        Args:
+            method: Название метода API
+            params: Параметры запроса
+            data: Данные для кэширования
+        """
+        if data is None:
+            logger.warning(f"Попытка кэширования None для метода {method}")
+            return
+        
+        cache_key = self._generate_cache_key(method, params)
+        
+        with self._lock:
+            entry = CacheEntry(
+                data=data,
+                created_at=datetime.now()
+            )
+            self._general_cache[cache_key] = entry
+            
+            logger.debug(f"Кэшированы данные для {method} (ключ: {cache_key[:16]}...)")
+    
+    def _generate_cache_key(self, method: str, params: Dict[str, Any]) -> str:
+        """
+        Генерация ключа кэша на основе метода и параметров
+        
+        Args:
+            method: Название метода
+            params: Параметры
+            
+        Returns:
+            str: Уникальный ключ кэша
+        """
+        # Сериализуем параметры в JSON с сортировкой ключей для консистентности
+        params_str = json.dumps(params, sort_keys=True, ensure_ascii=False)
+        # Создаем хеш для компактности
+        cache_data = f"{method}:{params_str}"
+        return hashlib.md5(cache_data.encode('utf-8')).hexdigest()
+
     def _is_valid(self, entry: CacheEntry) -> bool:
         """
         Проверка валидности записи кэша
@@ -264,6 +339,15 @@ class APIDataCache:
             for key in expired_invoices:
                 del self._invoice_cache[key]
                 removed_count += 1
+            
+            # Очистка общего кэша
+            expired_general = [
+                key for key, entry in self._general_cache.items()
+                if (current_time - entry.created_at) > self.default_ttl
+            ]
+            for key in expired_general:
+                del self._general_cache[key]
+                removed_count += 1
         
         if removed_count > 0:
             logger.info(f"Очищено {removed_count} устаревших записей кэша")
@@ -275,11 +359,13 @@ class APIDataCache:
         with self._lock:
             total_entries = (len(self._product_cache) + 
                            len(self._company_cache) + 
-                           len(self._invoice_cache))
+                           len(self._invoice_cache) +
+                           len(self._general_cache))
             
             self._product_cache.clear()
             self._company_cache.clear()
             self._invoice_cache.clear()
+            self._general_cache.clear()
             
             logger.info(f"Кэш полностью очищен, удалено {total_entries} записей")
     
@@ -305,7 +391,8 @@ class APIDataCache:
                 'cache_sizes': {
                     'products': len(self._product_cache),
                     'companies': len(self._company_cache),
-                    'invoices': len(self._invoice_cache)
+                    'invoices': len(self._invoice_cache),
+                    'general': len(self._general_cache)
                 },
                 'memory_efficiency': self._calculate_efficiency()
             }

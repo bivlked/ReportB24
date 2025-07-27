@@ -500,12 +500,12 @@ class DataProcessor:
                 total_amount = price * quantity
                 
                 # Формула Report BIG.py: ВСЕГДА (price * qty) / 1.2 * 0.2 (игнорируем tax_included)
-                vat_amount = total_amount / 1.2 * 0.2
+                # ОПТИМИЗАЦИЯ: /1.2 * 0.2 = 1/6, используем более эффективную формулу
+                vat_amount = total_amount / 6
                 
                 product.vat_amount = Decimal(str(round(vat_amount, 2)))
                 product.vat_rate = "20%"
                 product.formatted_vat = f"{vat_amount:,.2f}".replace(',', ' ').replace('.', ',')
-                
             elif tax_rate and tax_rate > 0:
                 # Универсальная логика для других ставок НДС (сохраняем совместимость)
                 vat_result = self.currency_processor.calculate_vat(

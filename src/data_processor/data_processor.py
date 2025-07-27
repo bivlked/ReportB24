@@ -492,8 +492,22 @@ class DataProcessor:
             tax_rate = raw_product.get('taxRate', 0)
             tax_included = raw_product.get('taxIncluded', 'N') == 'Y'
             
-            if tax_rate and tax_rate > 0:
-                # Используем ставку НДС из API
+            if tax_rate == 20:
+                # Специальная российская логика НДС 20% (по образцу Report BIG.py)
+                # ВАЖНО: Report BIG.py ВСЕГДА использует формулу /1.2 * 0.2 независимо от tax_included
+                price = float(raw_product.get('price', 0))
+                quantity = float(raw_product.get('quantity', 0))
+                total_amount = price * quantity
+                
+                # Формула Report BIG.py: ВСЕГДА (price * qty) / 1.2 * 0.2 (игнорируем tax_included)
+                vat_amount = total_amount / 1.2 * 0.2
+                
+                product.vat_amount = Decimal(str(round(vat_amount, 2)))
+                product.vat_rate = "20%"
+                product.formatted_vat = f"{vat_amount:,.2f}".replace(',', ' ').replace('.', ',')
+                
+            elif tax_rate and tax_rate > 0:
+                # Универсальная логика для других ставок НДС (сохраняем совместимость)
                 vat_result = self.currency_processor.calculate_vat(
                     product.total_amount, f'{tax_rate}%', amount_includes_vat=tax_included
                 )
@@ -506,7 +520,7 @@ class DataProcessor:
                     product.vat_rate = "0%"
                     product.formatted_vat = "нет"
             else:
-                # Товар без НДС
+                # Товар без НДС (текст "нет" как в Report BIG.py)
                 product.vat_amount = Decimal('0')
                 product.vat_rate = "0%"
                 product.formatted_vat = "нет"

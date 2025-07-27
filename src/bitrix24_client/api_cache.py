@@ -1,215 +1,379 @@
+#!/usr/bin/env python3
 """
-API Data Cache - Request Deduplication System
-Реализует кэширование API запросов для минимизации дублирующихся вызовов.
-Основан на решении Creative Phase: Request Deduplication with Short-Term Memory Cache.
+API Data Cache для оптимизации запросов к Bitrix24
+Phase 2.1 of detailed-report-enhancements-2025-07-25
+
+Цель: Request Deduplication Cache для минимизации API запросов
+- Кэширование продуктов по invoice_id
+- Кэширование информации о компаниях
+- Short-Term Memory Cache (сессионное кэширование)
 """
-import hashlib
-import time
-import threading
-import json
+
 import logging
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple
+from datetime import datetime, timedelta
 from dataclasses import dataclass
+import threading
+import time
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class CacheEntry:
-    """Запись в кэше с данными и временной меткой"""
+    """Запись в кэше с метаданными"""
     data: Any
-    timestamp: float
-    ttl: float = 300.0  # Time to live в секундах (5 минут)
+    created_at: datetime
+    access_count: int = 0
+    last_accessed: Optional[datetime] = None
     
-    def is_expired(self) -> bool:
-        """Проверяет, истекла ли запись"""
-        return time.time() - self.timestamp > self.ttl
-    
-    def age_seconds(self) -> float:
-        """Возвращает возраст записи в секундах"""
-        return time.time() - self.timestamp
+    def __post_init__(self):
+        if self.last_accessed is None:
+            self.last_accessed = self.created_at
 
 
 class APIDataCache:
     """
-    Система кэширования API данных с дедупликацией запросов.
+    Система кэширования данных API для минимизации запросов к Bitrix24
     
-    Основные принципы:
-    - Кэшируем результаты API запросов на 5 минут
-    - Используем SHA256 хэш параметров запроса для уникальности
-    - Thread-safe операции
-    - Автоматическая очистка устаревших записей
+    Реализует:
+    - Request Deduplication: предотвращение дублирующих запросов
+    - Short-Term Memory Cache: кэширование на время сессии
+    - Automatic Cleanup: очистка устаревших данных
     """
     
-    def __init__(self, default_ttl: float = 300.0):
+    def __init__(self, default_ttl_minutes: int = 15):
         """
         Инициализация кэша
         
         Args:
-            default_ttl: Время жизни записей по умолчанию (секунды)
+            default_ttl_minutes: Время жизни кэша по умолчанию в минутах
         """
-        self._cache: Dict[str, CacheEntry] = {}
-        self._lock = threading.Lock()
-        self.default_ttl = default_ttl
-        self._stats = {
-            'hits': 0,
-            'misses': 0,
-            'expired': 0,
-            'evicted': 0
-        }
+        self.default_ttl = timedelta(minutes=default_ttl_minutes)
         
-        logger.info(f"APIDataCache инициализирован с TTL={default_ttl}s")
+        # Основные кэши
+        self._product_cache: Dict[str, CacheEntry] = {}
+        self._company_cache: Dict[str, CacheEntry] = {}
+        self._invoice_cache: Dict[str, CacheEntry] = {}
+        
+        # Статистика
+        self._hits = 0
+        self._misses = 0
+        self._cache_created = datetime.now()
+        
+        # Thread safety
+        self._lock = threading.RLock()
+        
+        logger.info(f"APIDataCache инициализирован, TTL: {default_ttl_minutes} мин")
     
-    def _generate_cache_key(self, method: str, params: Dict[str, Any]) -> str:
+    def get_products_cached(self, invoice_id: str) -> Optional[List[Dict[str, Any]]]:
         """
-        Генерирует уникальный ключ кэша на основе метода и параметров
+        Получение кэшированных товаров для счета
         
         Args:
-            method: Название API метода
-            params: Параметры запроса
+            invoice_id: ID счета
             
         Returns:
-            SHA256 хэш как ключ кэша
+            List[Dict]: Список товаров или None если нет в кэше
         """
-        # Создаем стабильный JSON для хэширования
-        cache_data = {
-            'method': method,
-            'params': params
-        }
-        
-        # Сортируем ключи для стабильности хэша
-        json_str = json.dumps(cache_data, sort_keys=True, ensure_ascii=False)
-        
-        # Генерируем SHA256 хэш
-        hash_object = hashlib.sha256(json_str.encode('utf-8'))
-        return hash_object.hexdigest()
-    
-    def get(self, method: str, params: Dict[str, Any]) -> Optional[Any]:
-        """
-        Получить данные из кэша
-        
-        Args:
-            method: Название API метода
-            params: Параметры запроса
-            
-        Returns:
-            Кэшированные данные или None если не найдено/истекло
-        """
-        cache_key = self._generate_cache_key(method, params)
+        cache_key = f"products_{invoice_id}"
         
         with self._lock:
-            entry = self._cache.get(cache_key)
+            entry = self._product_cache.get(cache_key)
             
-            if entry is None:
-                self._stats['misses'] += 1
-                logger.debug(f"Cache MISS: {method} - {cache_key[:8]}...")
-                return None
+            if entry and self._is_valid(entry):
+                # Cache HIT
+                entry.access_count += 1
+                entry.last_accessed = datetime.now()
+                self._hits += 1
+                
+                logger.debug(f"Cache HIT: продукты для счета {invoice_id} "
+                           f"(обращений: {entry.access_count})")
+                return entry.data
             
-            if entry.is_expired():
-                # Удаляем истекшую запись
-                del self._cache[cache_key]
-                self._stats['expired'] += 1
-                logger.debug(f"Cache EXPIRED: {method} - {cache_key[:8]}... (age: {entry.age_seconds():.1f}s)")
-                return None
-            
-            self._stats['hits'] += 1
-            logger.debug(f"Cache HIT: {method} - {cache_key[:8]}... (age: {entry.age_seconds():.1f}s)")
-            return entry.data
+            # Cache MISS
+            self._misses += 1
+            logger.debug(f"Cache MISS: продукты для счета {invoice_id}")
+            return None
     
-    def put(self, method: str, params: Dict[str, Any], data: Any, ttl: Optional[float] = None) -> None:
+    def set_products_cached(self, invoice_id: str, products: List[Dict[str, Any]]) -> None:
         """
-        Сохранить данные в кэш
+        Сохранение товаров в кэш
         
         Args:
-            method: Название API метода
-            params: Параметры запроса
-            data: Данные для кэширования
-            ttl: Время жизни записи (по умолчанию используется default_ttl)
+            invoice_id: ID счета
+            products: Список товаров для кэширования
         """
-        cache_key = self._generate_cache_key(method, params)
-        effective_ttl = ttl if ttl is not None else self.default_ttl
+        if not products:
+            logger.warning(f"Попытка кэширования пустого списка товаров для счета {invoice_id}")
+            return
+        
+        cache_key = f"products_{invoice_id}"
         
         with self._lock:
             entry = CacheEntry(
-                data=data,
-                timestamp=time.time(),
-                ttl=effective_ttl
+                data=products,
+                created_at=datetime.now()
             )
+            self._product_cache[cache_key] = entry
             
-            self._cache[cache_key] = entry
-            logger.debug(f"Cache PUT: {method} - {cache_key[:8]}... (TTL: {effective_ttl}s)")
+            logger.debug(f"Кэшировано {len(products)} товаров для счета {invoice_id}")
     
-    def clear(self) -> None:
-        """Очистить весь кэш"""
+    def get_company_cached(self, invoice_number: str) -> Optional[Tuple[str, str]]:
+        """
+        Получение кэшированной информации о компании
+        
+        Args:
+            invoice_number: Номер счета
+            
+        Returns:
+            Tuple[str, str]: (company_name, inn) или None если нет в кэше
+        """
+        cache_key = f"company_{invoice_number}"
+        
         with self._lock:
-            cleared_count = len(self._cache)
-            self._cache.clear()
-            logger.info(f"Cache cleared: {cleared_count} entries removed")
+            entry = self._company_cache.get(cache_key)
+            
+            if entry and self._is_valid(entry):
+                # Cache HIT
+                entry.access_count += 1
+                entry.last_accessed = datetime.now()
+                self._hits += 1
+                
+                logger.debug(f"Cache HIT: компания для счета {invoice_number}")
+                return entry.data
+            
+            # Cache MISS
+            self._misses += 1
+            logger.debug(f"Cache MISS: компания для счета {invoice_number}")
+            return None
+    
+    def set_company_cached(self, invoice_number: str, company_name: str, inn: str) -> None:
+        """
+        Сохранение информации о компании в кэш
+        
+        Args:
+            invoice_number: Номер счета
+            company_name: Название компании
+            inn: ИНН компании
+        """
+        cache_key = f"company_{invoice_number}"
+        
+        with self._lock:
+            entry = CacheEntry(
+                data=(company_name, inn),
+                created_at=datetime.now()
+            )
+            self._company_cache[cache_key] = entry
+            
+            logger.debug(f"Кэширована компания {company_name} для счета {invoice_number}")
+    
+    def get_invoice_cached(self, invoice_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Получение кэшированной информации о счете
+        
+        Args:
+            invoice_id: ID счета
+            
+        Returns:
+            Dict: Данные счета или None если нет в кэше
+        """
+        cache_key = f"invoice_{invoice_id}"
+        
+        with self._lock:
+            entry = self._invoice_cache.get(cache_key)
+            
+            if entry and self._is_valid(entry):
+                entry.access_count += 1
+                entry.last_accessed = datetime.now()
+                self._hits += 1
+                
+                logger.debug(f"Cache HIT: счет {invoice_id}")
+                return entry.data
+            
+            self._misses += 1
+            logger.debug(f"Cache MISS: счет {invoice_id}")
+            return None
+    
+    def set_invoice_cached(self, invoice_id: str, invoice_data: Dict[str, Any]) -> None:
+        """
+        Сохранение данных счета в кэш
+        
+        Args:
+            invoice_id: ID счета
+            invoice_data: Данные счета
+        """
+        cache_key = f"invoice_{invoice_id}"
+        
+        with self._lock:
+            entry = CacheEntry(
+                data=invoice_data,
+                created_at=datetime.now()
+            )
+            self._invoice_cache[cache_key] = entry
+            
+            logger.debug(f"Кэширован счет {invoice_id}")
+    
+    def _is_valid(self, entry: CacheEntry) -> bool:
+        """
+        Проверка валидности записи кэша
+        
+        Args:
+            entry: Запись кэша
+            
+        Returns:
+            bool: True если запись валидна
+        """
+        age = datetime.now() - entry.created_at
+        return age <= self.default_ttl
     
     def cleanup_expired(self) -> int:
         """
-        Удалить все истекшие записи
+        Очистка устаревших записей кэша
         
         Returns:
-            Количество удаленных записей
+            int: Количество удаленных записей
         """
+        removed_count = 0
+        current_time = datetime.now()
+        
         with self._lock:
-            expired_keys = [
-                key for key, entry in self._cache.items()
-                if entry.is_expired()
+            # Очистка кэша товаров
+            expired_products = [
+                key for key, entry in self._product_cache.items()
+                if (current_time - entry.created_at) > self.default_ttl
             ]
+            for key in expired_products:
+                del self._product_cache[key]
+                removed_count += 1
             
-            for key in expired_keys:
-                del self._cache[key]
+            # Очистка кэша компаний
+            expired_companies = [
+                key for key, entry in self._company_cache.items()
+                if (current_time - entry.created_at) > self.default_ttl
+            ]
+            for key in expired_companies:
+                del self._company_cache[key]
+                removed_count += 1
             
-            if expired_keys:
-                self._stats['evicted'] += len(expired_keys)
-                logger.debug(f"Cache cleanup: {len(expired_keys)} expired entries removed")
-            
-            return len(expired_keys)
+            # Очистка кэша счетов
+            expired_invoices = [
+                key for key, entry in self._invoice_cache.items()
+                if (current_time - entry.created_at) > self.default_ttl
+            ]
+            for key in expired_invoices:
+                del self._invoice_cache[key]
+                removed_count += 1
+        
+        if removed_count > 0:
+            logger.info(f"Очищено {removed_count} устаревших записей кэша")
+        
+        return removed_count
     
-    def get_stats(self) -> Dict[str, Any]:
+    def clear_all(self) -> None:
+        """Полная очистка всех кэшей"""
+        with self._lock:
+            total_entries = (len(self._product_cache) + 
+                           len(self._company_cache) + 
+                           len(self._invoice_cache))
+            
+            self._product_cache.clear()
+            self._company_cache.clear()
+            self._invoice_cache.clear()
+            
+            logger.info(f"Кэш полностью очищен, удалено {total_entries} записей")
+    
+    def get_cache_stats(self) -> Dict[str, Any]:
         """
-        Получить статистику кэша
+        Получение статистики кэша
         
         Returns:
-            Словарь со статистикой
+            Dict: Статистика использования кэша
         """
         with self._lock:
-            total_requests = self._stats['hits'] + self._stats['misses']
-            hit_rate = (self._stats['hits'] / total_requests * 100) if total_requests > 0 else 0.0
+            total_requests = self._hits + self._misses
+            hit_rate = (self._hits / total_requests * 100) if total_requests > 0 else 0
+            
+            uptime = datetime.now() - self._cache_created
             
             return {
-                'cache_size': len(self._cache),
-                'hits': self._stats['hits'],
-                'misses': self._stats['misses'],
-                'expired': self._stats['expired'],
-                'evicted': self._stats['evicted'],
                 'hit_rate_percent': round(hit_rate, 2),
-                'total_requests': total_requests
+                'total_hits': self._hits,
+                'total_misses': self._misses,
+                'total_requests': total_requests,
+                'uptime_minutes': round(uptime.total_seconds() / 60, 1),
+                'cache_sizes': {
+                    'products': len(self._product_cache),
+                    'companies': len(self._company_cache),
+                    'invoices': len(self._invoice_cache)
+                },
+                'memory_efficiency': self._calculate_efficiency()
             }
     
-    def __len__(self) -> int:
-        """Количество записей в кэше"""
-        return len(self._cache)
+    def _calculate_efficiency(self) -> str:
+        """
+        Расчет эффективности кэша
+        
+        Returns:
+            str: Оценка эффективности
+        """
+        stats = self.get_cache_stats()
+        hit_rate = stats['hit_rate_percent']
+        
+        if hit_rate >= 80:
+            return "Отличная"
+        elif hit_rate >= 60:
+            return "Хорошая"
+        elif hit_rate >= 40:
+            return "Удовлетворительная"
+        else:
+            return "Требует оптимизации"
     
-    def __contains__(self, cache_key: str) -> bool:
-        """Проверка наличия ключа в кэше"""
-        with self._lock:
-            entry = self._cache.get(cache_key)
-            return entry is not None and not entry.is_expired()
+    def print_cache_report(self) -> None:
+        """Вывод детального отчета о состоянии кэша"""
+        stats = self.get_cache_stats()
+        
+        print("\n" + "="*50)
+        print("📊 ОТЧЕТ О СОСТОЯНИИ API CACHE")
+        print("="*50)
+        print(f"🎯 Hit Rate: {stats['hit_rate_percent']}%")
+        print(f"✅ Попаданий: {stats['total_hits']}")
+        print(f"❌ Промахов: {stats['total_misses']}")
+        print(f"📈 Всего запросов: {stats['total_requests']}")
+        print(f"⏱️ Время работы: {stats['uptime_minutes']} мин")
+        print(f"🧠 Эффективность: {stats['memory_efficiency']}")
+        
+        print("\n📦 РАЗМЕРЫ КЭШЕЙ:")
+        for cache_type, size in stats['cache_sizes'].items():
+            print(f"  • {cache_type}: {size} записей")
+        
+        print("="*50)
 
 
-# Глобальный экземпляр кэша для использования в клиенте
-_global_cache = APIDataCache()
+# Глобальный экземпляр кэша для использования в приложении
+_global_cache: Optional[APIDataCache] = None
 
 
-def get_cache() -> APIDataCache:
-    """Получить глобальный экземпляр кэша"""
+def get_api_cache() -> APIDataCache:
+    """
+    Получение глобального экземпляра кэша
+    
+    Returns:
+        APIDataCache: Глобальный кэш
+    """
+    global _global_cache
+    if _global_cache is None:
+        _global_cache = APIDataCache()
     return _global_cache
 
 
-def set_cache_ttl(ttl: float) -> None:
-    """Установить новое время жизни по умолчанию для кэша"""
-    _global_cache.default_ttl = ttl
-    logger.info(f"Cache TTL updated to {ttl}s") 
+def clear_global_cache() -> None:
+    """Очистка глобального кэша"""
+    global _global_cache
+    if _global_cache:
+        _global_cache.clear_all()
+        _global_cache = None 
+
+
+# Alias для совместимости с существующим кодом
+get_cache = get_api_cache

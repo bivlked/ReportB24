@@ -104,6 +104,15 @@ class ExcelStyles:
             top=thin_side,
             bottom=thin_side
         )
+        
+        # Medium bottom border for invoice separators
+        medium_side = Side(border_style="medium", color=self.colors.BORDER_COLOR)
+        self.invoice_separator_border = Border(
+            left=thin_side,
+            right=thin_side,
+            top=thin_side,
+            bottom=medium_side  # Толстая нижняя граница
+        )
     
     def _init_alignments(self) -> None:
         """Initialize text alignment styles."""

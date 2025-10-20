@@ -326,12 +326,6 @@ class DetailedReportLayout:
             data_key="quantity"
         ),
         ColumnDefinition(
-            header="Ед. изм.",
-            width=10.0,
-            alignment="center",
-            data_key="unit_measure"
-        ),
-        ColumnDefinition(
             header="Цена",
             width=15.0,
             alignment="right",
@@ -342,6 +336,12 @@ class DetailedReportLayout:
             width=18.0,
             alignment="right",
             data_key="total_amount"
+        ),
+        ColumnDefinition(
+            header="Сумма НДС",
+            width=15.0,
+            alignment="right",
+            data_key="vat_amount"
         ),
     ]
     
@@ -459,7 +459,75 @@ class DetailedReportLayout:
                 for col_idx in range(self.START_COLUMN, self.START_COLUMN + self.total_columns):
                     cell = ws.cell(row=excel_row, column=col_idx)
                     cell.fill = zebra_fill
+
+    def apply_invoice_separator_borders(self, ws: Worksheet, data_rows: List[Dict[str, Any]]) -> None:
+        """
+        Применение толстых нижних границ для разделения счетов.
+        
+        Согласно Creative Phase решению: "Thick Bottom Border для последней строки каждого счета"
+        обеспечивает максимальную визуальную ясность границ между счетами.
+        
+        Args:
+            ws: OpenPyXL worksheet object
+            data_rows: Список строк данных с метаданными группировки
+        """
+        from openpyxl.styles import Border, Side
+        
+        if not data_rows:
+            return
+        
+        # Создаем стиль для границы между счетами
+        thin_side = Side(border_style="thin", color="000000")
+        medium_side = Side(border_style="medium", color="000000")
+        
+        separator_border = Border(
+            left=thin_side,
+            right=thin_side,
+            top=thin_side,
+            bottom=medium_side  # Толстая нижняя граница
+        )
+        
+        current_invoice_id = None
+        last_invoice_row = None
+        
+        # Находим последнюю строку каждого счета
+        for row_idx, row_data in enumerate(data_rows):
+            invoice_id = row_data.get('invoice_id')
+            
+            # Если начался новый счет и у нас есть предыдущий - применяем границу
+            if invoice_id != current_invoice_id and last_invoice_row is not None:
+                self._apply_separator_border_to_row(ws, last_invoice_row, separator_border)
+            
+            # Обновляем отслеживание
+            if invoice_id != current_invoice_id:
+                current_invoice_id = invoice_id
+            
+            last_invoice_row = row_idx
+        
+        # Применяем границу к последней строке последнего счета
+        if last_invoice_row is not None:
+            self._apply_separator_border_to_row(ws, last_invoice_row, separator_border)
     
+    def _apply_separator_border_to_row(self, ws: 'Worksheet', row_idx: int, border) -> None:
+        """
+        Применяет границу разделения к конкретной строке.
+        
+        Args:
+            ws: OpenPyXL worksheet object
+            row_idx: Индекс строки данных (0-based)
+            border: Стиль границы для применения
+        """
+        excel_row = self.DATA_START_ROW + row_idx
+        
+        # Применяем границу ко всем ячейкам строки
+        for col_idx in range(len(self.COLUMNS)):
+            excel_col = self.START_COLUMN + col_idx
+            cell = ws.cell(row=excel_row, column=excel_col)
+            
+            # Просто применяем границу, не трогая заливку
+            # (заливка уже установлена ранее через zebra-стилизацию)
+            cell.border = border
+
     def get_data_cell_position(self, row_index: int, column_index: int) -> Tuple[int, int]:
         """
         Get Excel cell position for detailed data.
@@ -572,6 +640,9 @@ class DetailedWorksheetBuilder:
         # Apply zebra effect after writing all data
         self.layout.apply_zebra_effect(ws, data_rows)
         
+        # Apply thick borders between invoices
+        self.layout.apply_invoice_separator_borders(ws, data_rows)
+        
         # 🔧 УНИФИКАЦИЯ: Применяем жирные границы вокруг таблицы как в кратком отчете
         self._apply_detailed_table_borders(ws, len(data_rows))
         
@@ -580,11 +651,13 @@ class DetailedWorksheetBuilder:
     
     def _get_detailed_column_number_format(self, col_idx: int) -> str:
         """
-        🔧 УНИФИКАЦИЯ: Числовое форматирование для детального отчета
+        🔧 ИСПРАВЛЕНИЕ: Числовое форматирование для детального отчета
         
-        Применяет такое же форматирование как в кратком отчете:
-        - ИНН (индекс 2): '0' - целое число
-        - Кол-во, Цена, Сумма (индексы 4, 6, 7): '#,##0.00' - числа с разделителями
+        Применяет правильное форматирование согласно требованиям:
+        - ИНН (индекс 1): 'General' - текстовый формат
+        - Кол-во (индекс 4): '0' - целое число
+        - Цена, Сумма (индексы 5, 6): '#,##0.00' - числа с разделителями
+        - Сумма НДС (индекс 7): '#,##0.00' - числа с разделителями
         - Остальные: 'General' - обычный формат
         
         Args:
@@ -593,22 +666,24 @@ class DetailedWorksheetBuilder:
         Returns:
             Строка формата числа для Excel
         """
-        # 🔧 ИСПРАВЛЕНИЕ: Обновленное соответствие столбцов детального отчета:
+        # Структура столбцов детального отчета:
         # 0: Номер (текст)
-        # 1: ИНН (число) - поменялись местами с Контрагент
-        # 2: Контрагент (текст) - поменялись местами с ИНН
+        # 1: ИНН (текст) - ИЗМЕНЕНО на текстовый формат
+        # 2: Контрагент (текст)
         # 3: Наименование товара (текст)
-        # 4: Кол-во (ЦЕЛОЕ число) - требование пользователя
-        # 5: Ед. изм. (текст)
-        # 6: Цена (число с 2 знаками)
-        # 7: Сумма (число с 2 знаками)
+        # 4: Кол-во (число)
+        # 5: Цена (число)
+        # 6: Сумма (число)
+        # 7: Сумма НДС (число или текст)
         
-        if col_idx == 1:  # ИНН (теперь второй столбец)
-            return '0'  # Целое число без разделителей (как в кратком отчете)
-        elif col_idx == 4:  # Кол-во - ЦЕЛЫЕ числа (без дробной части)
-            return '0'  # Целое число без дробной части
-        elif col_idx in [6, 7]:  # Цена, Сумма
-            return '#,##0.00'  # Число с разделителями тысяч и 2 знака после запятой
+        if col_idx == 1:  # ИНН - остается текстом
+            return 'General'  # Текстовый формат
+        elif col_idx == 4:  # Кол-во
+            return '0'  # Целое число
+        elif col_idx in [5, 6]:  # Цена, Сумма
+            return '#,##0.00'  # Число с разделителями тысяч
+        elif col_idx == 7:  # Сумма НДС
+            return '#,##0.00'  # Число с разделителями тысяч
         else:
             return 'General'  # Обычный формат для остальных
     
@@ -716,7 +791,7 @@ class DetailedWorksheetBuilder:
             elif data_key == "product_name":
                 optimal_width = max(optimal_width, 25)  # Минимум для товара
                 optimal_width = min(optimal_width, 60)  # Максимум для товара
-            elif data_key in ["price", "total_amount"]:
+            elif data_key in ["price", "total_amount", "vat_amount"]:
                 optimal_width = max(optimal_width, 15)  # Минимум для денежных полей
                 optimal_width = min(optimal_width, 25)  # Максимум для денежных полей
             else:

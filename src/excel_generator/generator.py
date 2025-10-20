@@ -164,14 +164,17 @@ class ExcelReportGenerator:
                 if fill_color:
                     cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
                 
-                # 1. Специальное выравнивание для столбца НДС (индекс 4)
-                if col_idx == 4:  # Столбец НДС
+                # Специальное выравнивание для краткого отчета
+                if col_idx == 4:  # Столбец "НДС" в кратком отчете
                     if str(value).lower() == "нет":
                         # Для "нет" - центрирование
                         cell.alignment = Alignment(horizontal="center", vertical="center")
                     else:
                         # Для числовых значений - правое выравнивание
                         cell.alignment = Alignment(horizontal="right", vertical="center")
+                elif col_idx == 7:  # Столбец "Дата оплаты" в кратком отчете
+                    # Для дат оплаты - центрирование
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
                 else:
                     # Выравнивание по типу столбца для остальных
                     cell.alignment = self._get_column_alignment(col_idx)

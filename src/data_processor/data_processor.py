@@ -488,18 +488,42 @@ class DataProcessor:
             product.total_amount = product.price * product.quantity
             product.formatted_total = f"{float(product.total_amount):,.2f}".replace(',', ' ').replace('.', ',')
             
-            # Расчет НДС (предполагаем 20%)
-            vat_result = self.currency_processor.calculate_vat(
-                product.total_amount, '20%', amount_includes_vat=True
-            )
-            if vat_result.is_valid:
-                product.vat_amount = vat_result.vat_amount
+            # Расчет НДС на основе данных API
+            tax_rate = raw_product.get('taxRate', 0)
+            tax_included = raw_product.get('taxIncluded', 'N') == 'Y'
+            
+            if tax_rate == 20:
+                # Специальная российская логика НДС 20% (по образцу Report BIG.py)
+                # ВАЖНО: Report BIG.py ВСЕГДА использует формулу /1.2 * 0.2 независимо от tax_included
+                price = float(raw_product.get('price', 0))
+                quantity = float(raw_product.get('quantity', 0))
+                total_amount = price * quantity
+                
+                # Формула Report BIG.py: ВСЕГДА (price * qty) / 1.2 * 0.2 (игнорируем tax_included)
+                # ОПТИМИЗАЦИЯ: /1.2 * 0.2 = 1/6, используем более эффективную формулу
+                vat_amount = total_amount / 6
+                
+                product.vat_amount = Decimal(str(round(vat_amount, 2)))
                 product.vat_rate = "20%"
-                product.formatted_vat = f"{float(product.vat_amount):,.2f}".replace(',', ' ').replace('.', ',')
+                product.formatted_vat = f"{vat_amount:,.2f}".replace(',', ' ').replace('.', ',')
+            elif tax_rate and tax_rate > 0:
+                # Универсальная логика для других ставок НДС (сохраняем совместимость)
+                vat_result = self.currency_processor.calculate_vat(
+                    product.total_amount, f'{tax_rate}%', amount_includes_vat=tax_included
+                )
+                if vat_result.is_valid:
+                    product.vat_amount = vat_result.vat_amount
+                    product.vat_rate = f"{tax_rate}%"
+                    product.formatted_vat = f"{float(product.vat_amount):,.2f}".replace(',', ' ').replace('.', ',')
+                else:
+                    product.vat_amount = Decimal('0')
+                    product.vat_rate = "0%"
+                    product.formatted_vat = "нет"
             else:
+                # Товар без НДС (текст "нет" как в Report BIG.py)
                 product.vat_amount = Decimal('0')
                 product.vat_rate = "0%"
-                product.formatted_vat = "0,00"
+                product.formatted_vat = "нет"
             
             # Валидация товара
             product.is_valid = bool(
@@ -629,12 +653,14 @@ class DataProcessor:
         
         for invoice_id, invoice_data in sorted_invoices:
             # Добавляем товары этого счета
+            is_first_product_in_invoice = True
             for product in invoice_data.products:
                 if product.is_valid:
                     excel_row = {
-                        'invoice_number': invoice_data.account_number,
-                        'company_name': invoice_data.company_name or 'Не найдено',
-                        'inn': invoice_data.inn or 'Не найдено',
+                        # Мета-поля заполняются только для первой строки каждого счета
+                        'invoice_number': invoice_data.account_number if is_first_product_in_invoice else '',
+                        'company_name': (invoice_data.company_name or 'Не найдено') if is_first_product_in_invoice else '',
+                        'inn': (invoice_data.inn or 'Не найдено') if is_first_product_in_invoice else '',
                         'product_name': product.product_name,
                         'quantity': product.formatted_quantity,
                         'unit_measure': product.unit_measure,
@@ -644,9 +670,57 @@ class DataProcessor:
                         
                         # Метаданные для группировки
                         'invoice_id': invoice_id,
-                        'is_first_product': len(excel_rows) == 0 or excel_rows[-1].get('invoice_id') != invoice_id
+                        'is_first_product': is_first_product_in_invoice
                     }
                     excel_rows.append(excel_row)
+                    is_first_product_in_invoice = False  # Следующие товары не первые
         
         logger.info(f"Excel форматирование завершено: {len(excel_rows)} строк товаров")
+        return excel_rows
+
+    def format_detailed_products_for_excel(
+        self, 
+        products: List[Dict[str, Any]], 
+        invoice_info: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        Форматирование товаров для детального Excel отчета.
+        
+        Использует существующую логику расчета НДС и форматирования
+        для обеспечения консистентности с кратким отчетом.
+        
+        Args:
+            products: Список товаров из API crm.item.productrow.list
+            invoice_info: Информация о счете (номер, контрагент, ИНН)
+            
+        Returns:
+            List[Dict]: Строки для Excel отчета с правильными типами данных
+        """
+        excel_rows = []
+        
+        logger.info(f"Форматирование детальных товаров для Excel: {len(products)} товаров")
+        
+        for product in products:
+            # Используем существующий метод format_product_data
+            product_data = self.format_product_data(product)
+            
+            if product_data.is_valid:
+                # Формируем строку для Excel с правильными типами данных
+                excel_row = {
+                    'invoice_number': invoice_info.get('account_number', ''),
+                    'company_name': invoice_info.get('company_name', 'Не найдено'),
+                    'inn': invoice_info.get('inn', 'Не найдено'),
+                    'product_name': product_data.product_name,
+                    'quantity': int(float(product_data.quantity)),  # Число, не строка
+                    'unit_measure': product_data.unit_measure,
+                    'price': float(product_data.price),  # Число, не строка
+                    'total_amount': float(product_data.total_amount),  # Число, не строка
+                    'vat_amount': product_data.vat_amount if product_data.vat_amount > 0 else "нет",  # Число или текст
+                    'invoice_id': invoice_info.get('invoice_id')
+                }
+                excel_rows.append(excel_row)
+            else:
+                logger.warning(f"Товар не прошел валидацию: {product.get('productName', 'Неизвестный')}")
+        
+        logger.info(f"Детальное форматирование завершено: {len(excel_rows)} строк товаров")
         return excel_rows

@@ -109,7 +109,7 @@ def main():
                 # 🔧 ИСПРАВЛЕНИЕ: Убираем BATCH API и используем индивидуальные запросы
                 print("📦 Получение данных товаров (индивидуальные запросы)...")
                 
-                # Получение товаров для каждого счета индивидуально
+                # 🔧 ИСПРАВЛЕНИЕ: Использование DataProcessor для унификации данных
                 detailed_data = []
                 total_products = 0
                 
@@ -126,22 +126,17 @@ def main():
                     account_number = invoice.get('accountNumber', f'Счет #{invoice_id}')
                     company_name, inn = bitrix_client.get_company_info_by_invoice(account_number) if account_number else ('Не найдено', 'Не найдено')
                     
-                    # Форматируем каждый товар для Excel
-                    for product in products:
-                        if product:  # Проверяем что товар не пустой
-                            detailed_row = {
-                                'invoice_number': account_number,
-                                'company_name': company_name if company_name not in ["Не найдено", "Ошибка"] else 'Не найдено',
-                                'inn': inn if inn not in ["Не найдено", "Ошибка"] else 'Не найдено',
-                                'product_name': product.get('productName', 'Товар без названия'),
-                                'quantity': f"{int(float(product.get('quantity', 0)))}",  # Целые числа без дробной части
-                                'unit_measure': product.get('measureName', 'шт'),
-                                'price': f"{float(product.get('price', 0)):,.2f}".replace(',', ' ').replace('.', ','),
-                                'total_amount': f"{float(product.get('price', 0)) * float(product.get('quantity', 0)):,.2f}".replace(',', ' ').replace('.', ','),
-                                # Метаданные для группировки в Excel
-                                'invoice_id': invoice_id
-                            }
-                            detailed_data.append(detailed_row)
+                    # 🔧 ИСПРАВЛЕНИЕ: Используем DataProcessor для форматирования товаров
+                    invoice_info = {
+                        'account_number': account_number,
+                        'company_name': company_name if company_name not in ["Не найдено", "Ошибка"] else 'Не найдено',
+                        'inn': inn if inn not in ["Не найдено", "Ошибка"] else 'Не найдено',
+                        'invoice_id': invoice_id
+                    }
+                    
+                    # Используем новый метод DataProcessor для правильного форматирования
+                    invoice_products = data_processor.format_detailed_products_for_excel(products, invoice_info)
+                    detailed_data.extend(invoice_products)
                 
                 print(f"✅ Обработано {len(detailed_data)} товаров из {len(invoices)} счетов")
                 

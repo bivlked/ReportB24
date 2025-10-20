@@ -677,3 +677,50 @@ class DataProcessor:
         
         logger.info(f"Excel форматирование завершено: {len(excel_rows)} строк товаров")
         return excel_rows
+
+    def format_detailed_products_for_excel(
+        self, 
+        products: List[Dict[str, Any]], 
+        invoice_info: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        Форматирование товаров для детального Excel отчета.
+        
+        Использует существующую логику расчета НДС и форматирования
+        для обеспечения консистентности с кратким отчетом.
+        
+        Args:
+            products: Список товаров из API crm.item.productrow.list
+            invoice_info: Информация о счете (номер, контрагент, ИНН)
+            
+        Returns:
+            List[Dict]: Строки для Excel отчета с правильными типами данных
+        """
+        excel_rows = []
+        
+        logger.info(f"Форматирование детальных товаров для Excel: {len(products)} товаров")
+        
+        for product in products:
+            # Используем существующий метод format_product_data
+            product_data = self.format_product_data(product)
+            
+            if product_data.is_valid:
+                # Формируем строку для Excel с правильными типами данных
+                excel_row = {
+                    'invoice_number': invoice_info.get('account_number', ''),
+                    'company_name': invoice_info.get('company_name', 'Не найдено'),
+                    'inn': invoice_info.get('inn', 'Не найдено'),
+                    'product_name': product_data.product_name,
+                    'quantity': int(float(product_data.quantity)),  # Число, не строка
+                    'unit_measure': product_data.unit_measure,
+                    'price': float(product_data.price),  # Число, не строка
+                    'total_amount': float(product_data.total_amount),  # Число, не строка
+                    'vat_amount': product_data.vat_amount if product_data.vat_amount > 0 else "нет",  # Число или текст
+                    'invoice_id': invoice_info.get('invoice_id')
+                }
+                excel_rows.append(excel_row)
+            else:
+                logger.warning(f"Товар не прошел валидацию: {product.get('productName', 'Неизвестный')}")
+        
+        logger.info(f"Детальное форматирование завершено: {len(excel_rows)} строк товаров")
+        return excel_rows

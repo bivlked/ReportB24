@@ -5,9 +5,8 @@
 
 import requests
 import logging
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
-from urllib.parse import urljoin
 
 from .rate_limiter import AdaptiveRateLimiter
 from .exceptions import (

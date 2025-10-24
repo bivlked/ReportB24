@@ -174,7 +174,7 @@ class ExcelDataFormatter:
                 'with_vat_numeric': float(with_vat)
             }
             
-        except Exception as e:
+        except Exception:
             # Fallback formatting
             fallback_amount = str(amount) if amount else "0,00"
             return {

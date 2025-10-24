@@ -268,3 +268,5 @@ def _get_column_number_format(self, col_idx: int) -> str:
 **Implementation Time**: ~1.5 часа  
 **Risk Level**: Low (высокая обратная совместимость)  
 **Success Criteria**: Числовые значения в столбцах E, F листа "Краткий" с сохранением всего остального форматирования
+
+

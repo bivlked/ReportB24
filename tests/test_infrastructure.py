@@ -21,7 +21,8 @@ class TestInfrastructure:
         # Проверяем наличие ключевых файлов
         assert (project_root / ".gitignore").exists(), ".gitignore должен существовать"
         assert (project_root / "pytest.ini").exists(), "pytest.ini должен существовать"
-        assert (project_root / "tasks.md").exists(), "tasks.md должен существовать"
+        # 🔧 ИСПРАВЛЕНИЕ: tasks.md перенесён в memory-bank/ (COMP-1)
+        assert (project_root / "memory-bank" / "tasks.md").exists(), "memory-bank/tasks.md должен существовать"
         assert (project_root / "config.ini").exists(), "config.ini должен существовать"
     
     def test_virtual_environment_active(self):

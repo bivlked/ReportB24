@@ -133,41 +133,6 @@ class DataProcessor:
         """
         self._bitrix_client = bitrix_client
 
-    def _get_company_info_with_cache(
-        self, company_id: str, bitrix_client: Any
-    ) -> Dict[str, Any]:
-        """
-        Получение информации о компании с использованием кэша
-
-        🔥 НОВОЕ (v2.1.2): Интеграция с APIDataCache для избежания
-        повторных API запросов к crm.company.get
-
-        Args:
-            company_id: ID компании
-            bitrix_client: Клиент Bitrix24
-
-        Returns:
-            Dict с информацией о компании
-        """
-        # Попытка получить из кэша
-        if hasattr(bitrix_client, "api_cache"):
-            cached_data = bitrix_client.api_cache.get_company_details_cached(company_id)
-
-            if cached_data is not None:
-                logger.debug(f"Реквизиты компании {company_id} получены из кэша")
-                return cached_data
-
-        # Запрос к API если нет в кэше
-        logger.debug(f"Запрос реквизитов компании {company_id} через API")
-        company_data = bitrix_client.call("crm.company.get", {"ID": company_id})
-
-        # Сохранение в кэш
-        if hasattr(bitrix_client, "api_cache"):
-            bitrix_client.api_cache.cache_company_details(company_id, company_data)
-            logger.debug(f"Реквизиты компании {company_id} сохранены в кэш")
-
-        return company_data
-
     def process_invoice_record(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Обработка записи Smart Invoice для workflow.

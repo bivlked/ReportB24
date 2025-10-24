@@ -840,15 +840,15 @@ class MultiSheetBuilder:
         """
         workbook = Workbook()
         
-        # Remove default sheet if exists
-        if workbook.worksheets:
+        # Remove the default sheet if it exists
+        if workbook.active:
             workbook.remove(workbook.active)
         
         # Create brief sheet first
-        brief_ws = self.brief_builder.create_worksheet(workbook, "Краткий")
+        self.brief_builder.create_worksheet(workbook, "Краткий")
         
         # Create detailed sheet
-        detailed_ws = self.detailed_builder.create_detailed_worksheet(workbook, "Полный")
+        self.detailed_builder.create_detailed_worksheet(workbook, "Полный")
         
         return workbook
     

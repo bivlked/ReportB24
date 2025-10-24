@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Простой запуск генератора отчётов Bitrix24.
+Генератор отчётов Bitrix24.
 
 Использует данные из config.ini для автоматической генерации отчёта.
-Замена ручного ввода данных на автоматическое чтение из конфигурации.
 """
 
 import sys
+import time
 from pathlib import Path
+from datetime import datetime
 
 # Добавить корень проекта в PYTHONPATH для корректных импортов из scripts/
 project_root = Path(__file__).parent.parent
@@ -15,96 +16,98 @@ sys.path.insert(0, str(project_root))
 from src.core.app import AppFactory
 
 
+def print_progress(message, step=None, total_steps=None):
+    """Вывод прогресса с простым индикатором."""
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    if step and total_steps:
+        progress = f"[{step}/{total_steps}]"
+        print(f"{timestamp} {progress} {message}")
+    else:
+        print(f"{timestamp} {message}")
+
+
 def main():
     """Основная функция запуска генератора отчётов."""
+    start_time = time.time()
     
-    print("🚀 Генератор отчётов Bitrix24 Excel v1.0.0")
-    print("=" * 50)
-    print("📁 Читаю данные из config.ini...")
+    print("\n" + "="*70)
+    print("  ГЕНЕРАТОР ОТЧЁТОВ BITRIX24")
+    print("="*70 + "\n")
     
     try:
-        # Создание и инициализация приложения
+        # Этап 1: Инициализация
+        print_progress("► Инициализация приложения...", 1, 4)
         with AppFactory.create_app(config_path="config.ini") as app:
             
-            # Получение информации о конфигурации
-            app_info = app.get_app_info()
-            print(f"✅ Приложение инициализировано")
-            print(f"📄 Конфигурация: {app_info['configuration']['config_path']}")
-            print("")
-            
-            # Показать настройки из config.ini
-            bitrix_config = app.config_reader.get_bitrix_config()
-            app_config = app.config_reader.get_app_config()
+            # Получение конфигурации
             report_period_config = app.config_reader.get_report_period_config()
+            app_config = app.config_reader.get_app_config()
             
-            # Безопасное отображение конфигурации
-            safe_config = app.config_reader.get_safe_config_info()
-            print("⚙️ Настройки из конфигурации:")
-            print(f"   🌐 Bitrix24: {safe_config['config']['bitrix']['webhook_url']}")
-            print(f"   📅 Период: {report_period_config.start_date} - {report_period_config.end_date}")
-            print(f"   📂 Папка: {app_config.default_save_folder}")
-            print(f"   📄 Файл: {app_config.default_filename}")
-            print(f"   🔐 Источники: config.ini {'✅' if safe_config['sources']['config_ini_exists'] else '❌'}, .env {'✅' if safe_config['sources']['env_file_exists'] else '❌'}")
-            print("")
+            print_progress(f"  Период: {report_period_config.start_date} - {report_period_config.end_date}")
+            print_progress(f"  Выходной файл: {app_config.default_filename}")
+            print()
             
-            # Валидация конфигурации
-            print("🔍 Проверка конфигурации...")
+            # Этап 2: Валидация
+            print_progress("► Проверка конфигурации...", 2, 4)
             if not app.validate_configuration():
-                print("❌ Ошибки в конфигурации. Проверьте config.ini")
+                print("  ✗ Ошибки в конфигурации")
                 error_report = app.get_error_report()
                 print(error_report)
                 return False
-            print("✅ Конфигурация корректна")
+            print_progress("  ✓ Конфигурация корректна")
+            print()
             
-            # Тестирование API
-            print("🔌 Тестирование подключения к Bitrix24...")
+            # Этап 3: Подключение
+            print_progress("► Тестирование подключения к Bitrix24...", 3, 4)
             if not app.test_api_connection():
-                print("❌ Не удалось подключиться к Bitrix24 API")
-                print("   Проверьте webhook URL в config.ini")
+                print("  ✗ Не удалось подключиться к Bitrix24 API")
                 return False
-            print("✅ Подключение к Bitrix24 успешно")
-            print("")
+            print_progress("  ✓ Подключение установлено")
+            print()
             
-            # Генерация отчёта
-            print("📊 Генерация отчёта...")
+            # Этап 4: Генерация
+            print_progress("► Генерация отчёта...", 4, 4)
             if app.generate_report():
-                print("🎉 Отчёт успешно сгенерирован!")
-                
-                # Показать путь к сгенерированному файлу
+                execution_time = time.time() - start_time
                 save_path = app.config_reader.get_safe_save_path()
-                print(f"📄 Файл сохранён: {save_path}")
+                
+                print_progress(f"  ✓ Отчёт сохранён: {save_path}")
+                print()
+                
+                # Итоговая сводка
+                print("="*70)
+                print("  ИТОГИ ГЕНЕРАЦИИ")
+                print("="*70)
+                print(f"  Период:          {report_period_config.start_date} - {report_period_config.end_date}")
+                print(f"  Время:           {execution_time:.1f} сек")
+                print(f"  Файл:            {save_path}")
+                print("="*70)
                 
                 return True
             else:
-                print("❌ Ошибка генерации отчёта")
+                print("  ✗ Ошибка генерации отчёта")
                 error_report = app.get_error_report()
-                print("\n📋 Подробная информация об ошибке:")
                 print(error_report)
                 return False
                 
     except KeyboardInterrupt:
-        print("\n⏹️ Работа прервана пользователем")
+        print("\n  ⏹ Работа прервана пользователем")
         return False
     except Exception as e:
-        print(f"\n💥 Критическая ошибка: {e}")
-        print("   Проверьте config.ini и доступность Bitrix24")
+        print(f"\n  ✗ Критическая ошибка: {e}")
         return False
 
 
 if __name__ == "__main__":
-    print("\n" + "="*50)
     success = main()
     
     if success:
-        print("\n✅ Работа завершена успешно!")
-        print("🎯 Результат: Отчёт Excel готов к использованию")
+        print("\n✓ Работа завершена успешно\n")
     else:
-        print("\n❌ Работа завершена с ошибками")
-        print("🔍 Проверьте config.ini и подключение к интернету")
+        print("\n✗ Работа завершена с ошибками\n")
     
-    print("="*50)
-    print("\n⏸️  Нажмите Enter для закрытия...")
-    input()  # Пауза для чтения результата
+    print("Нажмите Enter для закрытия...")
+    input()
     
     if not success:
         sys.exit(1) 

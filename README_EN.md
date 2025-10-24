@@ -138,7 +138,7 @@
 
 5. **Generate your first report:**
    ```bash
-   python run_report.py
+   python scripts/run_report.py
    ```
 
 **Done!** 🎉 Your first secure Excel report will be created in the `reports/` folder.
@@ -289,7 +289,7 @@ pytest tests/ -v
 
 **The simplest way:**
 ```bash
-python run_report.py
+python scripts/run_report.py
 ```
 
 This command:

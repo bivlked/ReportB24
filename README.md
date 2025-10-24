@@ -159,7 +159,7 @@ graph LR
 
 5. **Запустите первый отчёт:**
    ```bash
-   python run_report.py
+   python scripts/run_report.py
    ```
 
 **Готово!** 🎉 Ваш первый защищённый Excel отчёт будет создан в папке `reports/`.
@@ -324,7 +324,7 @@ pytest tests/ -v
 
 **Самый простой способ:**
 ```bash
-python run_report.py
+python scripts/run_report.py
 ```
 
 Эта команда:

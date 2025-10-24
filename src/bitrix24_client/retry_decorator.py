@@ -10,7 +10,7 @@
 
 import time
 import functools
-from typing import Callable, Any, Optional, Tuple, Type
+from typing import Callable, Any, Tuple, Type
 from requests.exceptions import RequestException, HTTPError
 import logging
 

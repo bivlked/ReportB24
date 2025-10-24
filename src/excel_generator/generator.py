@@ -15,6 +15,7 @@ from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from openpyxl.utils import get_column_letter
 from datetime import datetime
 import logging
+from decimal import Decimal
 
 from .styles import ExcelStyles, ColumnStyleConfig
 from .layout import (
@@ -55,6 +56,35 @@ class ExcelReportGenerator:
         # Новые компоненты для детального отчета - Фаза 4
         self.multi_sheet_builder = MultiSheetBuilder()
         self.detailed_builder = DetailedWorksheetBuilder()
+
+    def _safe_sum_numeric(self, values, key=None):
+        """
+        Безопасное суммирование значений, игнорируя нечисловые.
+        
+        🔧 ИСПРАВЛЕНИЕ БАГ-4: Решает проблему суммирования когда vat_amount 
+        может быть строкой "нет" вместо числа.
+        
+        Args:
+            values: Список значений или записей
+            key: Функция для извлечения значения (если values - записи)
+        
+        Returns:
+            Decimal: Сумма числовых значений
+        
+        Examples:
+            >>> _safe_sum_numeric([1, 2, "нет", 3])  # 6
+            >>> _safe_sum_numeric(records, key=lambda r: r['vat_amount'])
+        """
+        total = Decimal('0')
+        for item in values:
+            value = key(item) if key else item
+            
+            # Проверяем что значение числовое
+            if isinstance(value, (int, float, Decimal)):
+                total += Decimal(str(value))
+            # Иначе (строка, None и т.д.) - пропускаем
+        
+        return float(total)  # Возвращаем float для совместимости
 
     def create_report(self, data: List[Dict[str, Any]], output_path: str) -> str:
         """
@@ -727,15 +757,14 @@ class ExcelReportBuilder:
         """
         try:
             # Calculate basic summary statistics
+            # 🔧 ИСПРАВЛЕНИЕ БАГ-4: Используем _safe_sum_numeric для vat_amount
+            total_amount = sum(record.get("amount", 0) for record in invoices)
+            total_vat = self._safe_sum_numeric(invoices, key=lambda r: r.get("vat_amount", 0))
+            
             summary = {
                 "record_count": len(invoices),
-                "total_without_vat": sum(
-                    record.get("amount", 0) for record in invoices
-                ),
-                "total_with_vat": sum(
-                    record.get("amount", 0) + record.get("vat_amount", 0)
-                    for record in invoices
-                ),
+                "total_without_vat": total_amount,
+                "total_with_vat": total_amount + total_vat,
             }
 
             # Generate Excel file

@@ -719,6 +719,35 @@ class ExcelReportBuilder:
     def __init__(self):
         self.generator = ExcelReportGenerator()
 
+    def _safe_sum_numeric(self, values, key=None):
+        """
+        Безопасное суммирование значений, игнорируя нечисловые.
+        
+        🔧 ИСПРАВЛЕНИЕ БАГ-4: Решает проблему суммирования когда vat_amount 
+        может быть строкой "нет" вместо числа.
+        
+        Args:
+            values: Список значений или записей
+            key: Функция для извлечения значения (если values - записи)
+        
+        Returns:
+            Decimal: Сумма числовых значений
+        
+        Examples:
+            >>> _safe_sum_numeric([1, 2, "нет", 3])  # 6
+            >>> _safe_sum_numeric(records, key=lambda r: r['vat_amount'])
+        """
+        total = Decimal('0')
+        for item in values:
+            value = key(item) if key else item
+            
+            # Проверяем что значение числовое
+            if isinstance(value, (int, float, Decimal)):
+                total += Decimal(str(value))
+            # Иначе (строка, None и т.д.) - пропускаем
+        
+        return float(total)  # Возвращаем float для совместимости
+
     def build_invoice_report(
         self,
         invoices: List[Dict[str, Any]],

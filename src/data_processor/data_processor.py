@@ -4,7 +4,7 @@ Main Data Processor - оркестратор для обработки данн�
 """
 
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 import logging
@@ -44,6 +44,49 @@ class InvoiceData:
     def __post_init__(self):
         if self.validation_errors is None:
             self.validation_errors = []
+
+
+@dataclass
+class ProcessedInvoice:
+    """
+    Обработанные данные счета с валидацией (v2.4.0).
+    
+    Используется в новой гибридной архитектуре для batch обработки.
+    Все суммы хранятся как Decimal для корректного форматирования в Excel.
+    """
+    
+    # Основные поля
+    account_number: str
+    inn: str
+    counterparty: str
+    amount: Decimal  # Числовой тип для Excel!
+    vat_amount: Decimal | str  # Decimal или "нет"
+    invoice_date: datetime
+    shipping_date: datetime
+    payment_date: Optional[datetime]
+    
+    # Метаданные
+    is_unpaid: bool
+    is_valid: bool = True
+    validation_errors: List[str] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Конвертация в dict для передачи в Excel генератор.
+        Даты форматируются в строки, суммы остаются Decimal.
+        """
+        return {
+            'account_number': self.account_number,
+            'inn': self.inn,
+            'counterparty': self.counterparty,
+            'amount': self.amount,  # Decimal!
+            'vat_amount': self.vat_amount,  # Decimal или "нет"
+            'invoice_date': self.invoice_date.strftime('%d.%m.%Y') if self.invoice_date else '',
+            'shipping_date': self.shipping_date.strftime('%d.%m.%Y') if self.shipping_date else '',
+            'payment_date': self.payment_date.strftime('%d.%m.%Y') if self.payment_date else '',
+            'is_unpaid': self.is_unpaid,
+            'is_valid': self.is_valid
+        }
 
 
 @dataclass
@@ -132,6 +175,106 @@ class DataProcessor:
             bitrix_client: Экземпляр Bitrix24Client
         """
         self._bitrix_client = bitrix_client
+
+    def process_invoice_batch(self, raw_invoices: List[Dict[str, Any]]) -> List[ProcessedInvoice]:
+        """
+        Обрабатывает batch счетов с валидацией (v2.4.0).
+        
+        Новая гибридная архитектура: DataProcessor обрабатывает данные,
+        возвращает ProcessedInvoice с Decimal типами для Excel.
+        
+        Args:
+            raw_invoices: Сырые данные счетов из Bitrix24
+            
+        Returns:
+            List[ProcessedInvoice]: Обработанные счета с числовыми типами
+        """
+        processed = []
+        for invoice in raw_invoices:
+            try:
+                processed_invoice = self._process_single_invoice(invoice)
+                processed.append(processed_invoice)
+            except Exception as e:
+                logger.error(f"Ошибка обработки счета {invoice.get('id', 'N/A')}: {e}")
+                # Создаем invalid invoice для логирования
+                invalid = ProcessedInvoice(
+                    account_number=invoice.get('accountNumber', 'N/A'),
+                    inn='ERROR',
+                    counterparty='ERROR',
+                    amount=Decimal('0'),
+                    vat_amount='ERROR',
+                    invoice_date=datetime.now(),
+                    shipping_date=datetime.now(),
+                    payment_date=None,
+                    is_unpaid=True,
+                    is_valid=False,
+                    validation_errors=[str(e)]
+                )
+                processed.append(invalid)
+        
+        return processed
+    
+    def _process_single_invoice(self, invoice: Dict[str, Any]) -> ProcessedInvoice:
+        """
+        Обработка одного счета (v2.4.0).
+        
+        Args:
+            invoice: Сырые данные счета
+            
+        Returns:
+            ProcessedInvoice: Обработанный счет с валидацией
+        """
+        # Извлечение и валидация данных
+        account_number = invoice.get('accountNumber', '')
+        
+        # Обработка сумм (ЧИСЛОВЫЕ типы!)
+        amount = Decimal(str(invoice.get('opportunity', 0)))
+        tax_val = float(invoice.get('taxValue', 0))
+        vat_amount = Decimal(str(tax_val)) if tax_val > 0 else "нет"
+        
+        # Обработка дат (используем DateProcessor)
+        invoice_date = self._parse_date(invoice.get('begindate'))
+        shipping_date = self._parse_date(invoice.get('UFCRM_SMART_INVOICE_1651168135187'))
+        payment_date = self._parse_date(invoice.get('UFCRM_626D6ABE98692'))
+        
+        # Обработка реквизитов
+        counterparty = self._extract_smart_invoice_counterparty(invoice)
+        if not counterparty:
+            counterparty = invoice.get('title', 'Не найдено')
+        
+        inn = self._extract_smart_invoice_inn(invoice)
+        if not inn:
+            inn = 'Не найдено'
+        
+        # Валидация
+        is_unpaid = payment_date is None
+        
+        return ProcessedInvoice(
+            account_number=account_number,
+            inn=inn,
+            counterparty=counterparty,
+            amount=amount,
+            vat_amount=vat_amount,
+            invoice_date=invoice_date or datetime.now(),
+            shipping_date=shipping_date or datetime.now(),
+            payment_date=payment_date,
+            is_unpaid=is_unpaid
+        )
+    
+    def _parse_date(self, date_str: Optional[str]) -> Optional[datetime]:
+        """
+        Парсинг даты с использованием DateProcessor.
+        
+        Args:
+            date_str: Строка с датой
+            
+        Returns:
+            Optional[datetime]: Распарсенная дата или None
+        """
+        if not date_str:
+            return None
+        result = self.date_processor.parse_date(date_str)
+        return result.parsed_date if result.is_valid else None
 
     def process_invoice_record(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
         """

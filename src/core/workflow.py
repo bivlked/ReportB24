@@ -335,83 +335,37 @@ class WorkflowOrchestrator:
             handle_error(e, "_fetch_invoices_data", "WorkflowOrchestrator")
             raise
     
-    def _format_amount(self, amount: float) -> str:
-        """Форматирует сумму как в ShortReport.py"""
-        return f"{amount:,.2f}".replace(',', ' ').replace('.', ',')
-    
-    def _format_vat_amount(self, vat_amount: float) -> str:
-        """Форматирует НДС как в ShortReport.py"""
-        return self._format_amount(vat_amount) if vat_amount != 0 else "нет"
-    
-    def _format_date(self, date_str: str) -> str:
-        """Форматирует дату как в ShortReport.py"""
-        if not date_str:
-            return ""
-        try:
-            from datetime import datetime
-            d = datetime.fromisoformat(date_str.replace('Z', '+00:00')).date()
-            return d.strftime("%d.%m.%Y")
-        except:
-            return ""
+    # 🔧 v2.4.0: Методы _format_amount, _format_vat_amount, _format_date удалены
+    # Форматирование теперь выполняется в DataProcessor и ExcelReportGenerator
 
     def _process_invoices_data(self, raw_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Обрабатывает сырые данные счетов в формат для Excel (как в ShortReport.py).
+        Обрабатывает сырые данные счетов используя DataProcessor (v2.4.0).
+        
+        Новая гибридная архитектура:
+        - DataProcessor обрабатывает и валидирует данные
+        - WorkflowOrchestrator координирует процесс
+        - Excel генератор форматирует Decimal типы
         
         Args:
-            raw_data: Сырые данные из Bitrix24
+            raw_data: Сырые данные счетов из Bitrix24
             
         Returns:
-            List: Обработанные данные для Excel
+            List[Dict]: Обработанные данные для Excel с ЧИСЛОВЫМИ типами
         """
         try:
-            processed_records = []
+            # Используем DataProcessor для batch обработки!
+            processed_invoices = self.data_processor.process_invoice_batch(raw_data)
             
-            for record in raw_data:
-                try:
-                    # Формируем структуру данных для Excel (точно как в ShortReport.py)
-                    acc_num = record.get('accountNumber', '')
-                    sum_val = self._format_amount(float(record.get('opportunity', 0)))
-                    tax_val = float(record.get('taxValue', 0))
-                    tax_text = self._format_vat_amount(tax_val)
-
-                    date_bill_str = record.get('begindate')
-                    date_bill = self._format_date(date_bill_str)
-
-                    ship_date_str = record.get('UFCRM_SMART_INVOICE_1651168135187')
-                    ship_date = self._format_date(ship_date_str)
-
-                    pay_date_str = record.get('UFCRM_626D6ABE98692')
-                    pay_date = self._format_date(pay_date_str) if pay_date_str else ""
-
-                    comp_name = record.get('company_name', 'Не найдено')
-                    inn = record.get('company_inn', 'Не найдено')
-
-                    # Формируем данные в новом формате для ExcelReportGenerator
-                    processed_record = {
-                        'account_number': acc_num,
-                        'inn': inn,
-                        'counterparty': comp_name,
-                        'amount': sum_val,
-                        'vat_amount': tax_text,
-                        'invoice_date': date_bill,
-                        'shipping_date': ship_date,
-                        'payment_date': pay_date,
-                        'is_unpaid': pay_date == "",  # нет даты оплаты = красная строка
-                        'is_no_vat': tax_text == "нет",  # нет НДС = серая строка
-                        'amount_numeric': float(record.get('opportunity', 0)),  # для расчета итогов
-                        'vat_amount_numeric': tax_val  # для расчета итогов НДС
-                    }
-                    
-                    processed_records.append(processed_record)
-                        
-                except Exception as e:
-                    self.logger.warning(f"Ошибка обработки записи {record.get('id', 'unknown')}: {e}")
-                    continue
+            # Конвертируем ProcessedInvoice в dict для Excel
+            processed_records = [invoice.to_dict() for invoice in processed_invoices]
             
-            self.logger.info(f"Успешно обработано {len(processed_records)} из {len(raw_data)} записей")
+            # Фильтруем invalid записи
+            valid_records = [r for r in processed_records if r.get('is_valid', True)]
             
-            return processed_records
+            self.logger.info(f"Обработано {len(valid_records)} валидных записей из {len(raw_data)}")
+            
+            return valid_records
             
         except Exception as e:
             handle_error(e, "_process_invoices_data", "WorkflowOrchestrator")

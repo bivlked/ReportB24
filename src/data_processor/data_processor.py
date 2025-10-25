@@ -345,7 +345,8 @@ class DataProcessor:
         и метод get_company_info_by_invoice() из Bitrix24Client
         """
         account_number = raw_data.get("accountNumber", "")
-        if account_number and hasattr(self, "_bitrix_client"):
+        # 🔧 БАГ-A2: Правильная проверка клиента (is not None вместо hasattr)
+        if account_number and self._bitrix_client is not None:
             try:
                 company_name, inn = self._bitrix_client.get_company_info_by_invoice(
                     account_number
@@ -374,7 +375,8 @@ class DataProcessor:
         и метод get_company_info_by_invoice() из Bitrix24Client
         """
         account_number = raw_data.get("accountNumber", "")
-        if account_number and hasattr(self, "_bitrix_client"):
+        # 🔧 БАГ-A2: Правильная проверка клиента (is not None вместо hasattr)
+        if account_number and self._bitrix_client is not None:
             try:
                 company_name, inn = self._bitrix_client.get_company_info_by_invoice(
                     account_number

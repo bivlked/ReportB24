@@ -48,20 +48,22 @@ class ReportGeneratorApp:
     до генерации отчётов с централизованной обработкой ошибок.
     """
     
-    def __init__(self, config_path: str = "config.ini", enable_logging: bool = True):
+    def __init__(self, config_path: str = "config.ini", enable_logging: bool = True, use_secure_config: bool = True):
         """
         Инициализация приложения.
         
         Args:
             config_path: Путь к файлу конфигурации
             enable_logging: Включить логирование
+            use_secure_config: Использовать SecureConfigReader (True) или ConfigReader (False)
         """
         self.config_path = config_path
         self.enable_logging = enable_logging
+        self.use_secure_config = use_secure_config
         self.status = AppStatus()
         
-        # Компоненты системы
-        self.config_reader: Optional[SecureConfigReader] = None
+        # Компоненты системы (ConfigReader или SecureConfigReader)
+        self.config_reader = None
         self.bitrix_client: Optional[Bitrix24Client] = None
         self.data_processor: Optional[DataProcessor] = None
         self.excel_generator: Optional[ExcelReportGenerator] = None
@@ -159,11 +161,17 @@ class ReportGeneratorApp:
             self.status.is_validated = True
             self._log_info("Системные требования проверены ✓")
             
-            # 2. Загрузка конфигурации (с поддержкой .env)
-            self._log_info("Загрузка конфигурации с SecureConfigReader...")
-            self.config_reader = create_secure_config_reader(self.config_path)
+            # 2. Загрузка конфигурации (🔧 БАГ-A3: условный выбор ConfigReader)
+            if self.use_secure_config:
+                self._log_info("Загрузка конфигурации с SecureConfigReader...")
+                self.config_reader = create_secure_config_reader(self.config_path)
+                self._log_info("Конфигурация загружена с поддержкой .env ✓")
+            else:
+                self._log_info("Загрузка конфигурации с ConfigReader...")
+                self.config_reader = ConfigReader(self.config_path)
+                self._log_info("Конфигурация загружена ✓")
+            
             self.status.is_configured = True
-            self._log_info("Конфигурация загружена с поддержкой .env ✓")
             
             # 3. Инициализация компонентов
             self._log_info("Инициализация компонентов...")
@@ -391,7 +399,8 @@ class AppFactory:
         Returns:
             ReportGeneratorApp: Настроенный экземпляр приложения
         """
-        app = ReportGeneratorApp(config_path, enable_logging)
+        # 🔧 БАГ-A3: Передача use_secure_config в ReportGeneratorApp
+        app = ReportGeneratorApp(config_path, enable_logging, use_secure_config)
         
         if auto_initialize:
             success = app.initialize()

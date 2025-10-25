@@ -7,17 +7,15 @@
 """
 
 from typing import List, Dict, Any, Optional
-import os
 from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from openpyxl.utils import get_column_letter
-from datetime import datetime
 import logging
 from decimal import Decimal
 
-from .styles import ExcelStyles, ColumnStyleConfig
+from .styles import ExcelStyles
 from .layout import (
     WorksheetBuilder,
     ReportLayout,

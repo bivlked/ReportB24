@@ -12,7 +12,6 @@ from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 
 from ..config.config_reader import ConfigReader
-from ..config.settings import BitrixAPISettings
 from ..bitrix24_client.client import Bitrix24Client
 from ..data_processor.data_processor import DataProcessor
 from ..excel_generator.generator import ExcelReportGenerator

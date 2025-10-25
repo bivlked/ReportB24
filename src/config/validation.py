@@ -10,12 +10,12 @@ import sys
 import re
 import requests
 from pathlib import Path
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Tuple
 from dataclasses import dataclass
 import logging
 
-from .config_reader import ConfigReader, SecureConfigReader, BitrixConfig, AppConfig, ReportPeriodConfig
-from .settings import ValidationSettings, BitrixAPISettings
+from .config_reader import SecureConfigReader, BitrixConfig, AppConfig, ReportPeriodConfig
+from .settings import ValidationSettings
 
 
 @dataclass

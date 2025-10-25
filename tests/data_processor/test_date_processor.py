@@ -197,7 +197,7 @@ class TestDateTimeObjects:
         """Тест: невалидный timestamp"""
         result = processor.parse_date(-1)
         assert not result.is_valid
-        assert "Некорректный timestamp" in result.error_message
+        assert "Отрицательный timestamp" in result.error_message
 
 
 class TestDateValidation:

@@ -628,11 +628,16 @@ class DetailedWorksheetBuilder:
                 cell = ws.cell(row=excel_row, column=excel_col)
                 cell.value = row_data.get(col_def.data_key, "")
                 
-                # Apply alignment
-                cell.alignment = Alignment(horizontal=col_def.alignment, vertical="center")
-                
-                # 🔧 УНИФИКАЦИЯ: Применяем числовое форматирование как в кратком отчете
-                cell.number_format = self._get_detailed_column_number_format(col_idx)
+                # 🔧 ИСПРАВЛЕНИЕ БАГ-4: Специальная обработка для "нет" в НДС
+                if col_idx == 7 and str(cell.value).lower() == "нет":
+                    # Для "нет" - центрирование и ТЕКСТОВЫЙ формат
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    cell.number_format = "@"  # Текстовый формат
+                else:
+                    # Apply alignment
+                    cell.alignment = Alignment(horizontal=col_def.alignment, vertical="center")
+                    # 🔧 УНИФИКАЦИЯ: Применяем числовое форматирование как в кратком отчете
+                    cell.number_format = self._get_detailed_column_number_format(col_idx)
                 
                 # Apply border
                 cell.border = border_style
@@ -835,15 +840,15 @@ class MultiSheetBuilder:
         """
         workbook = Workbook()
         
-        # Remove default sheet if exists
-        if workbook.worksheets:
+        # Remove the default sheet if it exists
+        if workbook.active:
             workbook.remove(workbook.active)
         
         # Create brief sheet first
-        brief_ws = self.brief_builder.create_worksheet(workbook, "Краткий")
+        self.brief_builder.create_worksheet(workbook, "Краткий")
         
         # Create detailed sheet
-        detailed_ws = self.detailed_builder.create_detailed_worksheet(workbook, "Полный")
+        self.detailed_builder.create_detailed_worksheet(workbook, "Полный")
         
         return workbook
     

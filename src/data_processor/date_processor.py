@@ -126,6 +126,14 @@ class DateProcessor:
         # Если число (timestamp)
         if isinstance(date_value, (int, float)):
             try:
+                # Проверяем что timestamp положительный
+                if date_value < 0:
+                    return DateProcessingResult(
+                        is_valid=False,
+                        original_value=str(date_value),
+                        error_message=f"Отрицательный timestamp недопустим: {date_value}"
+                    )
+                
                 # Проверяем что это timestamp в секундах или миллисекундах
                 if date_value > 1e10:  # Миллисекунды
                     dt = datetime.fromtimestamp(date_value / 1000)

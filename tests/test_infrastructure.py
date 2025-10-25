@@ -21,14 +21,20 @@ class TestInfrastructure:
         # Проверяем наличие ключевых файлов
         assert (project_root / ".gitignore").exists(), ".gitignore должен существовать"
         assert (project_root / "pytest.ini").exists(), "pytest.ini должен существовать"
-        assert (project_root / "tasks.md").exists(), "tasks.md должен существовать"
+        # 🔧 ИСПРАВЛЕНИЕ: tasks.md перенесён в memory-bank/ (COMP-1)
+        assert (project_root / "memory-bank" / "tasks.md").exists(), "memory-bank/tasks.md должен существовать"
         assert (project_root / "config.ini").exists(), "config.ini должен существовать"
     
     def test_virtual_environment_active(self):
         """Тест: проверка активации виртуального окружения"""
         import sys
-        venv_path = Path(sys.executable).parent.parent
-        assert venv_path.name == ".venv", f"Виртуальное окружение не активно: {sys.executable}"
+        # 🔧 ИСПРАВЛЕНИЕ БАГ-5: Гибкая проверка любого активного venv
+        # Проверяем активность виртуального окружения (любое имя директории)
+        is_venv = (
+            hasattr(sys, 'real_prefix') or  # virtualenv
+            (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)  # venv
+        )
+        assert is_venv, f"Виртуальное окружение не активно: {sys.executable}"
     
     def test_pytest_coverage_setup(self):
         """Тест: проверка настройки coverage"""

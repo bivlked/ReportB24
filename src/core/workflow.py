@@ -97,6 +97,9 @@ class WorkflowOrchestrator:
         self.excel_generator = excel_generator
         self.config_reader = config_reader
         
+        # 🔧 ИСПРАВЛЕНИЕ БАГ-2: Передаём Bitrix24Client в DataProcessor
+        self.data_processor.set_bitrix_client(bitrix_client)
+        
         self.logger = logging.getLogger(self.__class__.__name__)
         self.current_progress: Optional[WorkflowProgress] = None
         

@@ -75,6 +75,9 @@ class ProcessedInvoice:
         Конвертация в dict для передачи в Excel генератор.
         Даты форматируются в строки, суммы остаются Decimal.
         """
+        # Определяем признак отсутствия НДС
+        is_no_vat = isinstance(self.vat_amount, str) and self.vat_amount == "нет"
+        
         return {
             'account_number': self.account_number,
             'inn': self.inn,
@@ -85,7 +88,11 @@ class ProcessedInvoice:
             'shipping_date': self.shipping_date.strftime('%d.%m.%Y') if self.shipping_date else '',
             'payment_date': self.payment_date.strftime('%d.%m.%Y') if self.payment_date else '',
             'is_unpaid': self.is_unpaid,
-            'is_valid': self.is_valid
+            'is_valid': self.is_valid,
+            'is_no_vat': is_no_vat,
+            # Для обратной совместимости с ExcelReportGenerator
+            'amount_numeric': float(self.amount),
+            'vat_amount_numeric': float(self.vat_amount) if not is_no_vat else 0,
         }
 
 

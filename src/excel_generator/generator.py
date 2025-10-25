@@ -179,14 +179,23 @@ class ExcelReportGenerator:
         for row_idx, record in enumerate(data):
             ws_row = self.start_row + 1 + row_idx  # +1 чтобы не перезаписать заголовки
 
-            # 🔥 ИСПРАВЛЕНИЕ: Получаем ЧИСЛА для amount/vat_amount (колонки E, F)
+            # 🔥 v2.4.0: Получаем ЧИСЛА (Decimal) для amount/vat_amount (колонки E, F)
             # Получаем данные строки в правильном порядке
+            amount_value = record.get("amount", 0)
+            vat_value = record.get("vat_amount", "")
+            
+            # Конвертируем Decimal в float для Excel
+            if isinstance(amount_value, Decimal):
+                amount_value = float(amount_value)
+            if isinstance(vat_value, Decimal):
+                vat_value = float(vat_value)
+            
             row_data = [
                 record.get("account_number", ""),
                 record.get("inn", ""),
                 record.get("counterparty", ""),
-                record.get("amount", 0),  # 🔥 ЧИСЛО для Excel форматирования
-                record.get("vat_amount", ""),  # 🔥 ЧИСЛО или "нет"
+                amount_value,  # float для Excel
+                vat_value,  # float или "нет"
                 record.get("invoice_date", ""),
                 record.get("shipping_date", ""),
                 record.get("payment_date", ""),

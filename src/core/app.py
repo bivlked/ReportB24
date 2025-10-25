@@ -7,6 +7,7 @@
 """
 
 import logging
+from logging.handlers import TimedRotatingFileHandler
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -75,7 +76,16 @@ class ReportGeneratorApp:
         self._log_info(f"Инициализирован {APP_NAME} v{APP_VERSION}")
     
     def _setup_logging(self) -> logging.Logger:
-        """Настраивает систему логирования."""
+        """
+        Настраивает систему логирования с автоматической ротацией (v2.4.0).
+        
+        Использует TimedRotatingFileHandler для автоматической ротации
+        логов в полночь. Старые логи сохраняются с суффиксом даты.
+        Автоматически удаляет логи старше 30 дней.
+        
+        Returns:
+            logging.Logger: Настроенный логгер
+        """
         # Создание директории для логов
         log_dir = Path("logs")
         log_dir.mkdir(exist_ok=True)
@@ -84,24 +94,34 @@ class ReportGeneratorApp:
         logger = logging.getLogger(self.__class__.__name__)
         logger.setLevel(logging.INFO)
         
-        # Обработчик для файла
-        log_file = log_dir / f"app_{datetime.now().strftime('%Y%m%d')}.log"
-        file_handler = logging.FileHandler(log_file, encoding='utf-8')
-        file_handler.setLevel(logging.INFO)
-        
-        # Обработчик для консоли
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        
-        # Форматтер
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        file_handler.setFormatter(formatter)
-        console_handler.setFormatter(formatter)
-        
-        # Добавление обработчиков если их ещё нет
+        # Обработчики добавляются только один раз
         if not logger.handlers:
+            # TimedRotatingFileHandler для автоматической ротации
+            log_file = log_dir / "app.log"
+            file_handler = TimedRotatingFileHandler(
+                filename=str(log_file),
+                when='midnight',      # Ротация в полночь
+                interval=1,           # Каждый день
+                backupCount=30,       # Хранить 30 дней
+                encoding='utf-8'
+            )
+            file_handler.setLevel(logging.INFO)
+            
+            # Суффикс для ротированных файлов: app.log.20251024
+            file_handler.suffix = "%Y%m%d"
+            
+            # Обработчик для консоли
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.INFO)
+            
+            # Единый форматтер
+            formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            file_handler.setFormatter(formatter)
+            console_handler.setFormatter(formatter)
+            
+            # Добавление обработчиков
             logger.addHandler(file_handler)
             logger.addHandler(console_handler)
         

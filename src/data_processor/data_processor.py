@@ -653,7 +653,7 @@ class DataProcessor:
 
     def format_product_data(self, raw_product: Dict[str, Any]) -> ProductData:
         """
-        Форматирование данных товара из productRows
+        Форматирование данных товара из productRows (v2.4.0 - refactored).
 
         Обрабатывает структуру товара из API crm.item.productrow.list:
         - Валидация цены и количества
@@ -670,105 +670,23 @@ class DataProcessor:
 
         try:
             # Извлечение базовых данных
-            product.product_id = str(raw_product.get("id", "")).strip()
-            product_name = str(
-                raw_product.get("productName", "Товар без названия")
-            ).strip()
-            product.product_name = (
-                product_name if product_name else "Товар без названия"
-            )
-            product.unit_measure = str(raw_product.get("measureName", "шт")).strip()
-
-            # Обработка цены
-            price_result = self.currency_processor.parse_amount(
-                raw_product.get("price", 0)
-            )
-            if price_result.is_valid:
-                product.price = price_result.amount
-                product.formatted_price = price_result.formatted_amount
-            else:
-                product.validation_errors.append(
-                    f"Невалидная цена: {raw_product.get('price')}"
-                )
-                product.price = Decimal("0")
-                product.formatted_price = "0,00"
-
-            # Обработка количества
-            quantity_result = self.currency_processor.parse_amount(
-                raw_product.get("quantity", 0)
-            )
-            if quantity_result.is_valid:
-                product.quantity = quantity_result.amount
-                product.formatted_quantity = f"{float(product.quantity):,.3f}".replace(
-                    ",", " "
-                ).replace(".", ",")
-            else:
-                product.validation_errors.append(
-                    f"Невалидное количество: {raw_product.get('quantity')}"
-                )
-                product.quantity = Decimal("0")
-                product.formatted_quantity = "0,000"
-
+            self._extract_product_basics(raw_product, product)
+            
+            # Обработка цены и количества
+            self._process_product_price(raw_product, product)
+            self._process_product_quantity(raw_product, product)
+            
             # Расчет общей суммы товара
             product.total_amount = product.price * product.quantity
-            product.formatted_total = f"{float(product.total_amount):,.2f}".replace(
-                ",", " "
-            ).replace(".", ",")
-
-            # Расчет НДС на основе данных API
-            tax_rate = raw_product.get("taxRate", 0)
-            tax_included = raw_product.get("taxIncluded", "N") == "Y"
-
-            if tax_rate == 20:
-                # Специальная российская логика НДС 20% (по образцу Report BIG.py)
-                # ВАЖНО: Report BIG.py ВСЕГДА использует формулу /1.2 * 0.2 независимо от tax_included
-                price = float(raw_product.get("price", 0))
-                quantity = float(raw_product.get("quantity", 0))
-                total_amount = price * quantity
-
-                # Формула Report BIG.py: ВСЕГДА (price * qty) / 1.2 * 0.2 (игнорируем tax_included)
-                # ОПТИМИЗАЦИЯ: /1.2 * 0.2 = 1/6, используем более эффективную формулу
-                vat_amount = total_amount / 6
-
-                product.vat_amount = Decimal(str(round(vat_amount, 2)))
-                product.vat_rate = "20%"
-                product.formatted_vat = f"{vat_amount:,.2f}".replace(",", " ").replace(
-                    ".", ","
-                )
-            elif tax_rate and tax_rate > 0:
-                # Универсальная логика для других ставок НДС (сохраняем совместимость)
-                vat_result = self.currency_processor.calculate_vat(
-                    product.total_amount,
-                    f"{tax_rate}%",
-                    amount_includes_vat=tax_included,
-                )
-                if vat_result.is_valid:
-                    product.vat_amount = vat_result.vat_amount
-                    product.vat_rate = f"{tax_rate}%"
-                    product.formatted_vat = f"{float(product.vat_amount):,.2f}".replace(
-                        ",", " "
-                    ).replace(".", ",")
-                else:
-                    product.vat_amount = Decimal("0")
-                    product.vat_rate = "0%"
-                    product.formatted_vat = "нет"
-            else:
-                # Товар без НДС (текст "нет" как в Report BIG.py)
-                product.vat_amount = Decimal("0")
-                product.vat_rate = "0%"
-                product.formatted_vat = "нет"
-
+            product.formatted_total = f"{float(product.total_amount):,.2f}".replace(",", " ").replace(".", ",")
+            
+            # Расчет НДС
+            self._calculate_product_vat(raw_product, product)
+            
             # Валидация товара
-            product.is_valid = bool(
-                product.product_name and product.price >= 0 and product.quantity >= 0
-            )
-
-            if not product.is_valid:
-                product.validation_errors.append("Товар не прошел базовую валидацию")
-
-            logger.debug(
-                f"Товар обработан: {product.product_name} - {product.formatted_total}"
-            )
+            self._validate_product(product)
+            
+            logger.debug(f"Товар обработан: {product.product_name} - {product.formatted_total}")
 
         except Exception as e:
             logger.error(f"Ошибка форматирования товара: {e}")
@@ -776,6 +694,91 @@ class DataProcessor:
             product.is_valid = False
 
         return product
+    
+    def _extract_product_basics(self, raw_product: Dict[str, Any], product: ProductData) -> None:
+        """Извлечение базовых данных товара."""
+        product.product_id = str(raw_product.get("id", "")).strip()
+        product_name = str(raw_product.get("productName", "Товар без названия")).strip()
+        product.product_name = product_name if product_name else "Товар без названия"
+        product.unit_measure = str(raw_product.get("measureName", "шт")).strip()
+    
+    def _process_product_price(self, raw_product: Dict[str, Any], product: ProductData) -> None:
+        """Обработка и валидация цены товара."""
+        price_result = self.currency_processor.parse_amount(raw_product.get("price", 0))
+        if price_result.is_valid:
+            product.price = price_result.amount
+            product.formatted_price = price_result.formatted_amount
+        else:
+            product.validation_errors.append(f"Невалидная цена: {raw_product.get('price')}")
+            product.price = Decimal("0")
+            product.formatted_price = "0,00"
+    
+    def _process_product_quantity(self, raw_product: Dict[str, Any], product: ProductData) -> None:
+        """Обработка и валидация количества товара."""
+        quantity_result = self.currency_processor.parse_amount(raw_product.get("quantity", 0))
+        if quantity_result.is_valid:
+            product.quantity = quantity_result.amount
+            product.formatted_quantity = f"{float(product.quantity):,.3f}".replace(",", " ").replace(".", ",")
+        else:
+            product.validation_errors.append(f"Невалидное количество: {raw_product.get('quantity')}")
+            product.quantity = Decimal("0")
+            product.formatted_quantity = "0,000"
+    
+    def _calculate_product_vat(self, raw_product: Dict[str, Any], product: ProductData) -> None:
+        """
+        Расчет НДС на основе данных API.
+        
+        Поддерживает:
+        - Специальную российскую логику НДС 20% (Report BIG.py совместимость)
+        - Универсальную логику для других ставок НДС
+        - Товары без НДС
+        """
+        tax_rate = raw_product.get("taxRate", 0)
+        tax_included = raw_product.get("taxIncluded", "N") == "Y"
+
+        if tax_rate == 20:
+            # Специальная российская логика НДС 20% (по образцу Report BIG.py)
+            # ВАЖНО: Report BIG.py ВСЕГДА использует формулу /1.2 * 0.2 независимо от tax_included
+            price = float(raw_product.get("price", 0))
+            quantity = float(raw_product.get("quantity", 0))
+            total_amount = price * quantity
+
+            # Формула Report BIG.py: ВСЕГДА (price * qty) / 1.2 * 0.2 (игнорируем tax_included)
+            # ОПТИМИЗАЦИЯ: /1.2 * 0.2 = 1/6, используем более эффективную формулу
+            vat_amount = total_amount / 6
+
+            product.vat_amount = Decimal(str(round(vat_amount, 2)))
+            product.vat_rate = "20%"
+            product.formatted_vat = f"{vat_amount:,.2f}".replace(",", " ").replace(".", ",")
+        elif tax_rate and tax_rate > 0:
+            # Универсальная логика для других ставок НДС (сохраняем совместимость)
+            vat_result = self.currency_processor.calculate_vat(
+                product.total_amount,
+                f"{tax_rate}%",
+                amount_includes_vat=tax_included,
+            )
+            if vat_result.is_valid:
+                product.vat_amount = vat_result.vat_amount
+                product.vat_rate = f"{tax_rate}%"
+                product.formatted_vat = f"{float(product.vat_amount):,.2f}".replace(",", " ").replace(".", ",")
+            else:
+                product.vat_amount = Decimal("0")
+                product.vat_rate = "0%"
+                product.formatted_vat = "нет"
+        else:
+            # Товар без НДС (текст "нет" как в Report BIG.py)
+            product.vat_amount = Decimal("0")
+            product.vat_rate = "0%"
+            product.formatted_vat = "нет"
+    
+    def _validate_product(self, product: ProductData) -> None:
+        """Валидация обработанных данных товара."""
+        product.is_valid = bool(
+            product.product_name and product.price >= 0 and product.quantity >= 0
+        )
+        
+        if not product.is_valid:
+            product.validation_errors.append("Товар не прошел базовую валидацию")
 
     def group_products_by_invoice(
         self, invoices_products: Dict[int, List[Dict[str, Any]]]

@@ -236,104 +236,151 @@ class WorkflowOrchestrator:
     
     def _fetch_invoices_data(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """
-        Получает данные счетов из Bitrix24 (как в ShortReport.py).
+        Получает данные счетов из Bitrix24 (v2.4.0 - refactored).
         
         Args:
             start_date: Дата начала периода (дд.мм.гггг)
             end_date: Дата окончания периода (дд.мм.гггг)
             
         Returns:
-            List: Список данных счетов
+            List: Список данных счетов с реквизитами
         """
         try:
-            from datetime import datetime
-            
-            # Конвертируем даты в объекты date
-            start_date_obj = datetime.strptime(start_date, "%d.%m.%Y").date()
-            end_date_obj = datetime.strptime(end_date, "%d.%m.%Y").date()
-            
+            # Конвертация дат
+            start_date_obj, end_date_obj = self._convert_date_range(start_date, end_date)
             self.logger.info(f"Получение Smart Invoices за период: {start_date_obj} - {end_date_obj}")
             
-            # Получаем все Smart Invoices (как в ShortReport.py)
-            filter_params = {
-                "!stageId": "DT31_1:D"  # исключаем удаленные
-            }
-            
-            # Поля для выборки (точно как в ShortReport.py)
-            select_fields = [
-                'id',
-                'accountNumber',
-                'statusId',
-                'dateBill',
-                'price',
-                'UFCRM_SMART_INVOICE_1651168135187',  # Дата отгрузки
-                'UFCRM_626D6ABE98692',               # Дата оплаты
-                'begindate',
-                'opportunity',
-                'stageId',
-                'taxValue'
-            ]
-            
-            # Получение всех Smart Invoices 
-            all_invoices = self.bitrix_client.get_smart_invoices(
-                entity_type_id=31,
-                filters=filter_params,
-                select=select_fields
-            )
-            
+            # Получение всех счетов
+            all_invoices = self._fetch_all_invoices()
             self.logger.info(f"Получено {len(all_invoices)} счетов всего")
             
-            # Фильтрация по дате отгрузки после получения (как в ShortReport.py)
-            filtered_invoices = []
-            for inv in all_invoices:
-                ship_date_str = inv.get('UFCRM_SMART_INVOICE_1651168135187')
-                if ship_date_str:
-                    try:
-                        d = datetime.fromisoformat(ship_date_str.replace('Z', '+00:00')).date()
-                        if start_date_obj <= d <= end_date_obj:
-                            filtered_invoices.append(inv)
-                    except ValueError as ex:
-                        self.logger.warning(f"Ошибка преобразования даты отгрузки (ID={inv.get('id')}): {ex}")
-            
+            # Фильтрация по дате отгрузки
+            filtered_invoices = self._filter_invoices_by_date(all_invoices, start_date_obj, end_date_obj)
             self.logger.info(f"Отфильтровано {len(filtered_invoices)} счетов по дате отгрузки")
             
-            # Обогащение данными реквизитов (как в ShortReport.py)
-            enriched_invoices = []
-            for invoice in filtered_invoices:
-                try:
-                    acc_num = invoice.get('accountNumber', '')
-                    
-                    # Получаем реквизиты компании
-                    comp_name, inn = self.bitrix_client.get_company_info_by_invoice(acc_num)
-                    if not comp_name and not inn:
-                        comp_name, inn = "Не найдено", "Не найдено"
-                    
-                    # Добавляем реквизиты к данным счета
-                    enriched_invoice = invoice.copy()
-                    enriched_invoice.update({
-                        'company_name': comp_name,
-                        'company_inn': inn
-                    })
-                    
-                    enriched_invoices.append(enriched_invoice)
-                    
-                except Exception as exp:
-                    self.logger.error(f"Ошибка обогащения счёта {invoice.get('id', 'N/A')}: {exp}")
-                    # Добавляем без реквизитов
-                    enriched_invoice = invoice.copy()
-                    enriched_invoice.update({
-                        'company_name': "Ошибка",
-                        'company_inn': "Ошибка"
-                    })
-                    enriched_invoices.append(enriched_invoice)
-            
+            # Обогащение реквизитами
+            enriched_invoices = self._enrich_invoices_with_requisites(filtered_invoices)
             self.logger.info(f"Итого обработано {len(enriched_invoices)} счетов с реквизитами")
+            
             return enriched_invoices
             
         except Exception as e:
             handle_error(e, "_fetch_invoices_data", "WorkflowOrchestrator")
             raise
     
+    def _convert_date_range(self, start_date: str, end_date: str) -> Tuple[Any, Any]:
+        """Конвертирует строковые даты в объекты date."""
+        from datetime import datetime
+        start_date_obj = datetime.strptime(start_date, "%d.%m.%Y").date()
+        end_date_obj = datetime.strptime(end_date, "%d.%m.%Y").date()
+        return start_date_obj, end_date_obj
+    
+    def _fetch_all_invoices(self) -> List[Dict[str, Any]]:
+        """
+        Получает все Smart Invoices из Bitrix24 (как в ShortReport.py).
+        
+        Returns:
+            List: Список всех счетов без фильтрации
+        """
+        filter_params = {
+            "!stageId": "DT31_1:D"  # исключаем удаленные
+        }
+        
+        # Поля для выборки (точно как в ShortReport.py)
+        select_fields = [
+            'id',
+            'accountNumber',
+            'statusId',
+            'dateBill',
+            'price',
+            'UFCRM_SMART_INVOICE_1651168135187',  # Дата отгрузки
+            'UFCRM_626D6ABE98692',               # Дата оплаты
+            'begindate',
+            'opportunity',
+            'stageId',
+            'taxValue'
+        ]
+        
+        return self.bitrix_client.get_smart_invoices(
+            entity_type_id=31,
+            filters=filter_params,
+            select=select_fields
+        )
+    
+    def _filter_invoices_by_date(
+        self, 
+        invoices: List[Dict[str, Any]], 
+        start_date: Any, 
+        end_date: Any
+    ) -> List[Dict[str, Any]]:
+        """
+        Фильтрует счета по дате отгрузки (как в ShortReport.py).
+        
+        Args:
+            invoices: Список всех счетов
+            start_date: Начало периода (date object)
+            end_date: Конец периода (date object)
+            
+        Returns:
+            List: Отфильтрованные счета
+        """
+        from datetime import datetime
+        filtered = []
+        
+        for inv in invoices:
+            ship_date_str = inv.get('UFCRM_SMART_INVOICE_1651168135187')
+            if ship_date_str:
+                try:
+                    d = datetime.fromisoformat(ship_date_str.replace('Z', '+00:00')).date()
+                    if start_date <= d <= end_date:
+                        filtered.append(inv)
+                except ValueError as ex:
+                    self.logger.warning(f"Ошибка преобразования даты отгрузки (ID={inv.get('id')}): {ex}")
+        
+        return filtered
+    
+    def _enrich_invoices_with_requisites(self, invoices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Обогащает счета данными реквизитов компаний (как в ShortReport.py).
+        
+        Args:
+            invoices: Список счетов для обогащения
+            
+        Returns:
+            List: Счета с добавленными полями company_name и company_inn
+        """
+        enriched = []
+        
+        for invoice in invoices:
+            try:
+                acc_num = invoice.get('accountNumber', '')
+                
+                # Получаем реквизиты компании
+                comp_name, inn = self.bitrix_client.get_company_info_by_invoice(acc_num)
+                if not comp_name and not inn:
+                    comp_name, inn = "Не найдено", "Не найдено"
+                
+                # Добавляем реквизиты к данным счета
+                enriched_invoice = invoice.copy()
+                enriched_invoice.update({
+                    'company_name': comp_name,
+                    'company_inn': inn
+                })
+                
+                enriched.append(enriched_invoice)
+                
+            except Exception as exp:
+                self.logger.error(f"Ошибка обогащения счёта {invoice.get('id', 'N/A')}: {exp}")
+                # Добавляем без реквизитов
+                enriched_invoice = invoice.copy()
+                enriched_invoice.update({
+                    'company_name': "Ошибка",
+                    'company_inn': "Ошибка"
+                })
+                enriched.append(enriched_invoice)
+        
+        return enriched
+
     # 🔧 v2.4.0: Методы _format_amount, _format_vat_amount, _format_date удалены
     # Форматирование теперь выполняется в DataProcessor и ExcelReportGenerator
 

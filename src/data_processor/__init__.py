@@ -6,12 +6,13 @@ Data Processor module для обработки данных отчёта.
 from .inn_processor import INNProcessor, INNValidationResult
 from .date_processor import DateProcessor, DateProcessingResult
 from .currency_processor import CurrencyProcessor, CurrencyProcessingResult, VATCalculationResult
-from .data_processor import DataProcessor, InvoiceData
+from .data_processor import DataProcessor, InvoiceData, ProcessedInvoice
 
 __all__ = [
     # Главный процессор
     'DataProcessor',
     'InvoiceData',
+    'ProcessedInvoice',
     
     # INN процессор
     'INNProcessor',

@@ -5,10 +5,8 @@ Converts processed data from data_processor modules into Excel-ready format
 with proper Russian formatting for dates, currencies, and VAT rates.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from decimal import Decimal
-import re
-from datetime import datetime
 
 from ..data_processor.currency_processor import CurrencyProcessor
 from ..data_processor.date_processor import DateProcessor

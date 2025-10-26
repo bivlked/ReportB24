@@ -3,7 +3,7 @@ INN (ИНН) Processor для валидации и обработки росс�
 Поддерживает 10-цифровые (юридические лица) и 12-цифровые (ИП) ИНН.
 """
 import re
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 from dataclasses import dataclass
 import logging
 

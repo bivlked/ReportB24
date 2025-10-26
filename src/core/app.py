@@ -7,13 +7,14 @@
 """
 
 import logging
+from logging.handlers import TimedRotatingFileHandler
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
-from ..config.config_reader import ConfigReader, create_config_reader, SecureConfigReader, create_secure_config_reader
+from ..config.config_reader import ConfigReader, create_secure_config_reader
 from ..config.settings import APP_NAME, APP_VERSION, get_runtime_info
 from ..config.validation import validate_system
 from ..bitrix24_client.client import Bitrix24Client
@@ -47,20 +48,22 @@ class ReportGeneratorApp:
     до генерации отчётов с централизованной обработкой ошибок.
     """
     
-    def __init__(self, config_path: str = "config.ini", enable_logging: bool = True):
+    def __init__(self, config_path: str = "config.ini", enable_logging: bool = True, use_secure_config: bool = True):
         """
         Инициализация приложения.
         
         Args:
             config_path: Путь к файлу конфигурации
             enable_logging: Включить логирование
+            use_secure_config: Использовать SecureConfigReader (True) или ConfigReader (False)
         """
         self.config_path = config_path
         self.enable_logging = enable_logging
+        self.use_secure_config = use_secure_config
         self.status = AppStatus()
         
-        # Компоненты системы
-        self.config_reader: Optional[SecureConfigReader] = None
+        # Компоненты системы (ConfigReader или SecureConfigReader)
+        self.config_reader = None
         self.bitrix_client: Optional[Bitrix24Client] = None
         self.data_processor: Optional[DataProcessor] = None
         self.excel_generator: Optional[ExcelReportGenerator] = None
@@ -75,7 +78,16 @@ class ReportGeneratorApp:
         self._log_info(f"Инициализирован {APP_NAME} v{APP_VERSION}")
     
     def _setup_logging(self) -> logging.Logger:
-        """Настраивает систему логирования."""
+        """
+        Настраивает систему логирования с автоматической ротацией (v2.4.0).
+        
+        Использует TimedRotatingFileHandler для автоматической ротации
+        логов в полночь. Старые логи сохраняются с суффиксом даты.
+        Автоматически удаляет логи старше 30 дней.
+        
+        Returns:
+            logging.Logger: Настроенный логгер
+        """
         # Создание директории для логов
         log_dir = Path("logs")
         log_dir.mkdir(exist_ok=True)
@@ -84,24 +96,34 @@ class ReportGeneratorApp:
         logger = logging.getLogger(self.__class__.__name__)
         logger.setLevel(logging.INFO)
         
-        # Обработчик для файла
-        log_file = log_dir / f"app_{datetime.now().strftime('%Y%m%d')}.log"
-        file_handler = logging.FileHandler(log_file, encoding='utf-8')
-        file_handler.setLevel(logging.INFO)
-        
-        # Обработчик для консоли
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        
-        # Форматтер
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        file_handler.setFormatter(formatter)
-        console_handler.setFormatter(formatter)
-        
-        # Добавление обработчиков если их ещё нет
+        # Обработчики добавляются только один раз
         if not logger.handlers:
+            # TimedRotatingFileHandler для автоматической ротации
+            log_file = log_dir / "app.log"
+            file_handler = TimedRotatingFileHandler(
+                filename=str(log_file),
+                when='midnight',      # Ротация в полночь
+                interval=1,           # Каждый день
+                backupCount=30,       # Хранить 30 дней
+                encoding='utf-8'
+            )
+            file_handler.setLevel(logging.INFO)
+            
+            # Суффикс для ротированных файлов: app.log.20251024
+            file_handler.suffix = "%Y%m%d"
+            
+            # Обработчик для консоли
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.INFO)
+            
+            # Единый форматтер
+            formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            file_handler.setFormatter(formatter)
+            console_handler.setFormatter(formatter)
+            
+            # Добавление обработчиков
             logger.addHandler(file_handler)
             logger.addHandler(console_handler)
         
@@ -139,11 +161,17 @@ class ReportGeneratorApp:
             self.status.is_validated = True
             self._log_info("Системные требования проверены ✓")
             
-            # 2. Загрузка конфигурации (с поддержкой .env)
-            self._log_info("Загрузка конфигурации с SecureConfigReader...")
-            self.config_reader = create_secure_config_reader(self.config_path)
+            # 2. Загрузка конфигурации (🔧 БАГ-A3: условный выбор ConfigReader)
+            if self.use_secure_config:
+                self._log_info("Загрузка конфигурации с SecureConfigReader...")
+                self.config_reader = create_secure_config_reader(self.config_path)
+                self._log_info("Конфигурация загружена с поддержкой .env ✓")
+            else:
+                self._log_info("Загрузка конфигурации с ConfigReader...")
+                self.config_reader = ConfigReader(self.config_path)
+                self._log_info("Конфигурация загружена ✓")
+            
             self.status.is_configured = True
-            self._log_info("Конфигурация загружена с поддержкой .env ✓")
             
             # 3. Инициализация компонентов
             self._log_info("Инициализация компонентов...")
@@ -371,7 +399,8 @@ class AppFactory:
         Returns:
             ReportGeneratorApp: Настроенный экземпляр приложения
         """
-        app = ReportGeneratorApp(config_path, enable_logging)
+        # 🔧 БАГ-A3: Передача use_secure_config в ReportGeneratorApp
+        app = ReportGeneratorApp(config_path, enable_logging, use_secure_config)
         
         if auto_initialize:
             success = app.initialize()

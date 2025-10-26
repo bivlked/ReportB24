@@ -11,7 +11,7 @@ import configparser
 import os
 import re
 from pathlib import Path
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
 try:

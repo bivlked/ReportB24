@@ -486,8 +486,9 @@ class APIDataCache:
         Returns:
             str: Оценка эффективности
         """
-        stats = self.get_cache_stats()
-        hit_rate = stats["hit_rate_percent"]
+        # Вычисляем hit_rate напрямую, избегая рекурсии с get_cache_stats()
+        total_requests = self._hits + self._misses
+        hit_rate = (self._hits / total_requests * 100) if total_requests > 0 else 0
 
         if hit_rate >= 80:
             return "Отличная"

@@ -4,7 +4,7 @@ Currency Processor для обработки валют и денежных су
 """
 import re
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional, Union, Dict, List
+from typing import Optional, Union, List
 from dataclasses import dataclass
 import logging
 

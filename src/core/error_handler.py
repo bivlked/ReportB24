@@ -7,9 +7,8 @@
 
 import logging
 import traceback
-import sys
 from datetime import datetime
-from typing import Dict, Any, Optional, List, Type, Union
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from pathlib import Path
 import json

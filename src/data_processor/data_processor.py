@@ -4,7 +4,7 @@ Main Data Processor - оркестратор для обработки данн�
 """
 
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 import logging
@@ -44,6 +44,56 @@ class InvoiceData:
     def __post_init__(self):
         if self.validation_errors is None:
             self.validation_errors = []
+
+
+@dataclass
+class ProcessedInvoice:
+    """
+    Обработанные данные счета с валидацией (v2.4.0).
+    
+    Используется в новой гибридной архитектуре для batch обработки.
+    Все суммы хранятся как Decimal для корректного форматирования в Excel.
+    """
+    
+    # Основные поля
+    account_number: str
+    inn: str
+    counterparty: str
+    amount: Decimal  # Числовой тип для Excel!
+    vat_amount: Decimal | str  # Decimal или "нет"
+    invoice_date: datetime
+    shipping_date: datetime
+    payment_date: Optional[datetime]
+    
+    # Метаданные
+    is_unpaid: bool
+    is_valid: bool = True
+    validation_errors: List[str] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Конвертация в dict для передачи в Excel генератор.
+        Даты форматируются в строки, суммы остаются Decimal.
+        """
+        # Определяем признак отсутствия НДС
+        is_no_vat = isinstance(self.vat_amount, str) and self.vat_amount == "нет"
+        
+        return {
+            'account_number': self.account_number,
+            'inn': self.inn,
+            'counterparty': self.counterparty,
+            'amount': self.amount,  # Decimal!
+            'vat_amount': self.vat_amount,  # Decimal или "нет"
+            'invoice_date': self.invoice_date.strftime('%d.%m.%Y') if self.invoice_date else '',
+            'shipping_date': self.shipping_date.strftime('%d.%m.%Y') if self.shipping_date else '',
+            'payment_date': self.payment_date.strftime('%d.%m.%Y') if self.payment_date else '',
+            'is_unpaid': self.is_unpaid,
+            'is_valid': self.is_valid,
+            'is_no_vat': is_no_vat,
+            # Для обратной совместимости с ExcelReportGenerator
+            'amount_numeric': float(self.amount),
+            'vat_amount_numeric': float(self.vat_amount) if not is_no_vat else 0,
+        }
 
 
 @dataclass
@@ -133,6 +183,106 @@ class DataProcessor:
         """
         self._bitrix_client = bitrix_client
 
+    def process_invoice_batch(self, raw_invoices: List[Dict[str, Any]]) -> List[ProcessedInvoice]:
+        """
+        Обрабатывает batch счетов с валидацией (v2.4.0).
+        
+        Новая гибридная архитектура: DataProcessor обрабатывает данные,
+        возвращает ProcessedInvoice с Decimal типами для Excel.
+        
+        Args:
+            raw_invoices: Сырые данные счетов из Bitrix24
+            
+        Returns:
+            List[ProcessedInvoice]: Обработанные счета с числовыми типами
+        """
+        processed = []
+        for invoice in raw_invoices:
+            try:
+                processed_invoice = self._process_single_invoice(invoice)
+                processed.append(processed_invoice)
+            except Exception as e:
+                logger.error(f"Ошибка обработки счета {invoice.get('id', 'N/A')}: {e}")
+                # Создаем invalid invoice для логирования
+                invalid = ProcessedInvoice(
+                    account_number=invoice.get('accountNumber', 'N/A'),
+                    inn='ERROR',
+                    counterparty='ERROR',
+                    amount=Decimal('0'),
+                    vat_amount='ERROR',
+                    invoice_date=datetime.now(),
+                    shipping_date=datetime.now(),
+                    payment_date=None,
+                    is_unpaid=True,
+                    is_valid=False,
+                    validation_errors=[str(e)]
+                )
+                processed.append(invalid)
+        
+        return processed
+    
+    def _process_single_invoice(self, invoice: Dict[str, Any]) -> ProcessedInvoice:
+        """
+        Обработка одного счета (v2.4.0).
+        
+        Args:
+            invoice: Сырые данные счета
+            
+        Returns:
+            ProcessedInvoice: Обработанный счет с валидацией
+        """
+        # Извлечение и валидация данных
+        account_number = invoice.get('accountNumber', '')
+        
+        # Обработка сумм (ЧИСЛОВЫЕ типы!)
+        amount = Decimal(str(invoice.get('opportunity', 0)))
+        tax_val = float(invoice.get('taxValue', 0))
+        vat_amount = Decimal(str(tax_val)) if tax_val > 0 else "нет"
+        
+        # Обработка дат (используем DateProcessor)
+        invoice_date = self._parse_date(invoice.get('begindate'))
+        shipping_date = self._parse_date(invoice.get('UFCRM_SMART_INVOICE_1651168135187'))
+        payment_date = self._parse_date(invoice.get('UFCRM_626D6ABE98692'))
+        
+        # Обработка реквизитов
+        counterparty = self._extract_smart_invoice_counterparty(invoice)
+        if not counterparty:
+            counterparty = invoice.get('title', 'Не найдено')
+        
+        inn = self._extract_smart_invoice_inn(invoice)
+        if not inn:
+            inn = 'Не найдено'
+        
+        # Валидация
+        is_unpaid = payment_date is None
+        
+        return ProcessedInvoice(
+            account_number=account_number,
+            inn=inn,
+            counterparty=counterparty,
+            amount=amount,
+            vat_amount=vat_amount,
+            invoice_date=invoice_date or datetime.now(),
+            shipping_date=shipping_date or datetime.now(),
+            payment_date=payment_date,
+            is_unpaid=is_unpaid
+        )
+    
+    def _parse_date(self, date_str: Optional[str]) -> Optional[datetime]:
+        """
+        Парсинг даты с использованием DateProcessor.
+        
+        Args:
+            date_str: Строка с датой
+            
+        Returns:
+            Optional[datetime]: Распарсенная дата или None
+        """
+        if not date_str:
+            return None
+        result = self.date_processor.parse_date(date_str)
+        return result.parsed_date if result.is_valid else None
+
     def process_invoice_record(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Обработка записи Smart Invoice для workflow.
@@ -195,7 +345,8 @@ class DataProcessor:
         и метод get_company_info_by_invoice() из Bitrix24Client
         """
         account_number = raw_data.get("accountNumber", "")
-        if account_number and hasattr(self, "_bitrix_client"):
+        # 🔧 БАГ-A2: Правильная проверка клиента (is not None вместо hasattr)
+        if account_number and self._bitrix_client is not None:
             try:
                 company_name, inn = self._bitrix_client.get_company_info_by_invoice(
                     account_number
@@ -224,7 +375,8 @@ class DataProcessor:
         и метод get_company_info_by_invoice() из Bitrix24Client
         """
         account_number = raw_data.get("accountNumber", "")
-        if account_number and hasattr(self, "_bitrix_client"):
+        # 🔧 БАГ-A2: Правильная проверка клиента (is not None вместо hasattr)
+        if account_number and self._bitrix_client is not None:
             try:
                 company_name, inn = self._bitrix_client.get_company_info_by_invoice(
                     account_number
@@ -304,24 +456,14 @@ class DataProcessor:
         return invoice
 
     def _extract_invoice_number(self, raw_data: Dict[str, Any]) -> Optional[str]:
-        """Извлечение номера счёта"""
+        """Извлечение номера счёта (v2.4.0 - optimized)"""
         possible_keys = ["number", "invoice_number", "ACCOUNT_NUMBER"]
-
-        for key in possible_keys:
-            if key in raw_data and raw_data[key]:
-                return str(raw_data[key]).strip()
-
-        return None
+        return next((str(raw_data[key]).strip() for key in possible_keys if key in raw_data and raw_data[key]), None)
 
     def _process_inn(self, raw_data: Dict[str, Any], invoice: InvoiceData) -> None:
-        """Обработка ИНН"""
+        """Обработка ИНН (v2.4.0 - optimized)"""
         possible_keys = ["inn", "INN", "UF_CRM_INN"]
-        inn_value = None
-
-        for key in possible_keys:
-            if key in raw_data and raw_data[key]:
-                inn_value = raw_data[key]
-                break
+        inn_value = next((raw_data[key] for key in possible_keys if key in raw_data and raw_data[key]), None)
 
         if inn_value:
             result = self.inn_processor.validate_inn(inn_value)
@@ -339,14 +481,9 @@ class DataProcessor:
             invoice.validation_errors.append("ИНН не найден")
 
     def _process_dates(self, raw_data: Dict[str, Any], invoice: InvoiceData) -> None:
-        """Обработка дат"""
+        """Обработка дат (v2.4.0 - optimized)"""
         date_keys = ["date_bill", "DATE_BILL", "created_time"]
-        date_value = None
-
-        for key in date_keys:
-            if key in raw_data and raw_data[key]:
-                date_value = raw_data[key]
-                break
+        date_value = next((raw_data[key] for key in date_keys if key in raw_data and raw_data[key]), None)
 
         if date_value:
             result = self.date_processor.parse_date(date_value)
@@ -361,14 +498,9 @@ class DataProcessor:
                 )
 
     def _process_amounts(self, raw_data: Dict[str, Any], invoice: InvoiceData) -> None:
-        """Обработка сумм"""
+        """Обработка сумм (v2.4.0 - optimized)"""
         amount_keys = ["opportunity", "OPPORTUNITY", "amount"]
-        amount_value = None
-
-        for key in amount_keys:
-            if key in raw_data and raw_data[key] is not None:
-                amount_value = raw_data[key]
-                break
+        amount_value = next((raw_data[key] for key in amount_keys if key in raw_data and raw_data[key] is not None), None)
 
         if amount_value is not None:
             result = self.currency_processor.parse_amount(amount_value)
@@ -394,14 +526,9 @@ class DataProcessor:
             invoice.validation_errors.append("Сумма не найдена")
 
     def _extract_counterparty(self, raw_data: Dict[str, Any]) -> Optional[str]:
-        """Извлечение наименования контрагента"""
+        """Извлечение наименования контрагента (v2.4.0 - optimized)"""
         possible_keys = ["title", "TITLE", "company_title"]
-
-        for key in possible_keys:
-            if key in raw_data and raw_data[key]:
-                return str(raw_data[key]).strip()
-
-        return None
+        return next((str(raw_data[key]).strip() for key in possible_keys if key in raw_data and raw_data[key]), None)
 
     def _validate_invoice(self, invoice: InvoiceData) -> None:
         """Финальная валидация счёта"""
@@ -416,11 +543,13 @@ class DataProcessor:
             if not getattr(invoice, field):
                 invoice.validation_errors.append(f"Отсутствует {description}")
 
-    def process_invoice_batch(
+    def process_invoice_batch_legacy(
         self, raw_data_list: List[Dict[str, Any]]
     ) -> List[InvoiceData]:
         """
-        Пакетная обработка списка счетов.
+        Пакетная обработка списка счетов (LEGACY).
+        
+        DEPRECATED: Используйте process_invoice_batch() для новой архитектуры v2.4.0.
 
         Args:
             raw_data_list: Список сырых данных счетов
@@ -501,7 +630,7 @@ class DataProcessor:
 
     def format_product_data(self, raw_product: Dict[str, Any]) -> ProductData:
         """
-        Форматирование данных товара из productRows
+        Форматирование данных товара из productRows (v2.4.0 - refactored).
 
         Обрабатывает структуру товара из API crm.item.productrow.list:
         - Валидация цены и количества
@@ -518,105 +647,23 @@ class DataProcessor:
 
         try:
             # Извлечение базовых данных
-            product.product_id = str(raw_product.get("id", "")).strip()
-            product_name = str(
-                raw_product.get("productName", "Товар без названия")
-            ).strip()
-            product.product_name = (
-                product_name if product_name else "Товар без названия"
-            )
-            product.unit_measure = str(raw_product.get("measureName", "шт")).strip()
-
-            # Обработка цены
-            price_result = self.currency_processor.parse_amount(
-                raw_product.get("price", 0)
-            )
-            if price_result.is_valid:
-                product.price = price_result.amount
-                product.formatted_price = price_result.formatted_amount
-            else:
-                product.validation_errors.append(
-                    f"Невалидная цена: {raw_product.get('price')}"
-                )
-                product.price = Decimal("0")
-                product.formatted_price = "0,00"
-
-            # Обработка количества
-            quantity_result = self.currency_processor.parse_amount(
-                raw_product.get("quantity", 0)
-            )
-            if quantity_result.is_valid:
-                product.quantity = quantity_result.amount
-                product.formatted_quantity = f"{float(product.quantity):,.3f}".replace(
-                    ",", " "
-                ).replace(".", ",")
-            else:
-                product.validation_errors.append(
-                    f"Невалидное количество: {raw_product.get('quantity')}"
-                )
-                product.quantity = Decimal("0")
-                product.formatted_quantity = "0,000"
-
+            self._extract_product_basics(raw_product, product)
+            
+            # Обработка цены и количества
+            self._process_product_price(raw_product, product)
+            self._process_product_quantity(raw_product, product)
+            
             # Расчет общей суммы товара
             product.total_amount = product.price * product.quantity
-            product.formatted_total = f"{float(product.total_amount):,.2f}".replace(
-                ",", " "
-            ).replace(".", ",")
-
-            # Расчет НДС на основе данных API
-            tax_rate = raw_product.get("taxRate", 0)
-            tax_included = raw_product.get("taxIncluded", "N") == "Y"
-
-            if tax_rate == 20:
-                # Специальная российская логика НДС 20% (по образцу Report BIG.py)
-                # ВАЖНО: Report BIG.py ВСЕГДА использует формулу /1.2 * 0.2 независимо от tax_included
-                price = float(raw_product.get("price", 0))
-                quantity = float(raw_product.get("quantity", 0))
-                total_amount = price * quantity
-
-                # Формула Report BIG.py: ВСЕГДА (price * qty) / 1.2 * 0.2 (игнорируем tax_included)
-                # ОПТИМИЗАЦИЯ: /1.2 * 0.2 = 1/6, используем более эффективную формулу
-                vat_amount = total_amount / 6
-
-                product.vat_amount = Decimal(str(round(vat_amount, 2)))
-                product.vat_rate = "20%"
-                product.formatted_vat = f"{vat_amount:,.2f}".replace(",", " ").replace(
-                    ".", ","
-                )
-            elif tax_rate and tax_rate > 0:
-                # Универсальная логика для других ставок НДС (сохраняем совместимость)
-                vat_result = self.currency_processor.calculate_vat(
-                    product.total_amount,
-                    f"{tax_rate}%",
-                    amount_includes_vat=tax_included,
-                )
-                if vat_result.is_valid:
-                    product.vat_amount = vat_result.vat_amount
-                    product.vat_rate = f"{tax_rate}%"
-                    product.formatted_vat = f"{float(product.vat_amount):,.2f}".replace(
-                        ",", " "
-                    ).replace(".", ",")
-                else:
-                    product.vat_amount = Decimal("0")
-                    product.vat_rate = "0%"
-                    product.formatted_vat = "нет"
-            else:
-                # Товар без НДС (текст "нет" как в Report BIG.py)
-                product.vat_amount = Decimal("0")
-                product.vat_rate = "0%"
-                product.formatted_vat = "нет"
-
+            product.formatted_total = f"{float(product.total_amount):,.2f}".replace(",", " ").replace(".", ",")
+            
+            # Расчет НДС
+            self._calculate_product_vat(raw_product, product)
+            
             # Валидация товара
-            product.is_valid = bool(
-                product.product_name and product.price >= 0 and product.quantity >= 0
-            )
-
-            if not product.is_valid:
-                product.validation_errors.append("Товар не прошел базовую валидацию")
-
-            logger.debug(
-                f"Товар обработан: {product.product_name} - {product.formatted_total}"
-            )
+            self._validate_product(product)
+            
+            logger.debug(f"Товар обработан: {product.product_name} - {product.formatted_total}")
 
         except Exception as e:
             logger.error(f"Ошибка форматирования товара: {e}")
@@ -624,6 +671,91 @@ class DataProcessor:
             product.is_valid = False
 
         return product
+    
+    def _extract_product_basics(self, raw_product: Dict[str, Any], product: ProductData) -> None:
+        """Извлечение базовых данных товара."""
+        product.product_id = str(raw_product.get("id", "")).strip()
+        product_name = str(raw_product.get("productName", "Товар без названия")).strip()
+        product.product_name = product_name if product_name else "Товар без названия"
+        product.unit_measure = str(raw_product.get("measureName", "шт")).strip()
+    
+    def _process_product_price(self, raw_product: Dict[str, Any], product: ProductData) -> None:
+        """Обработка и валидация цены товара."""
+        price_result = self.currency_processor.parse_amount(raw_product.get("price", 0))
+        if price_result.is_valid:
+            product.price = price_result.amount
+            product.formatted_price = price_result.formatted_amount
+        else:
+            product.validation_errors.append(f"Невалидная цена: {raw_product.get('price')}")
+            product.price = Decimal("0")
+            product.formatted_price = "0,00"
+    
+    def _process_product_quantity(self, raw_product: Dict[str, Any], product: ProductData) -> None:
+        """Обработка и валидация количества товара."""
+        quantity_result = self.currency_processor.parse_amount(raw_product.get("quantity", 0))
+        if quantity_result.is_valid:
+            product.quantity = quantity_result.amount
+            product.formatted_quantity = f"{float(product.quantity):,.3f}".replace(",", " ").replace(".", ",")
+        else:
+            product.validation_errors.append(f"Невалидное количество: {raw_product.get('quantity')}")
+            product.quantity = Decimal("0")
+            product.formatted_quantity = "0,000"
+    
+    def _calculate_product_vat(self, raw_product: Dict[str, Any], product: ProductData) -> None:
+        """
+        Расчет НДС на основе данных API.
+        
+        Поддерживает:
+        - Специальную российскую логику НДС 20% (Report BIG.py совместимость)
+        - Универсальную логику для других ставок НДС
+        - Товары без НДС
+        """
+        tax_rate = raw_product.get("taxRate", 0)
+        tax_included = raw_product.get("taxIncluded", "N") == "Y"
+
+        if tax_rate == 20:
+            # Специальная российская логика НДС 20% (по образцу Report BIG.py)
+            # ВАЖНО: Report BIG.py ВСЕГДА использует формулу /1.2 * 0.2 независимо от tax_included
+            price = float(raw_product.get("price", 0))
+            quantity = float(raw_product.get("quantity", 0))
+            total_amount = price * quantity
+
+            # Формула Report BIG.py: ВСЕГДА (price * qty) / 1.2 * 0.2 (игнорируем tax_included)
+            # ОПТИМИЗАЦИЯ: /1.2 * 0.2 = 1/6, используем более эффективную формулу
+            vat_amount = total_amount / 6
+
+            product.vat_amount = Decimal(str(round(vat_amount, 2)))
+            product.vat_rate = "20%"
+            product.formatted_vat = f"{vat_amount:,.2f}".replace(",", " ").replace(".", ",")
+        elif tax_rate and tax_rate > 0:
+            # Универсальная логика для других ставок НДС (сохраняем совместимость)
+            vat_result = self.currency_processor.calculate_vat(
+                product.total_amount,
+                f"{tax_rate}%",
+                amount_includes_vat=tax_included,
+            )
+            if vat_result.is_valid:
+                product.vat_amount = vat_result.vat_amount
+                product.vat_rate = f"{tax_rate}%"
+                product.formatted_vat = f"{float(product.vat_amount):,.2f}".replace(",", " ").replace(".", ",")
+            else:
+                product.vat_amount = Decimal("0")
+                product.vat_rate = "0%"
+                product.formatted_vat = "нет"
+        else:
+            # Товар без НДС (текст "нет" как в Report BIG.py)
+            product.vat_amount = Decimal("0")
+            product.vat_rate = "0%"
+            product.formatted_vat = "нет"
+    
+    def _validate_product(self, product: ProductData) -> None:
+        """Валидация обработанных данных товара."""
+        product.is_valid = bool(
+            product.product_name and product.price >= 0 and product.quantity >= 0
+        )
+        
+        if not product.is_valid:
+            product.validation_errors.append("Товар не прошел базовую валидацию")
 
     def group_products_by_invoice(
         self, invoices_products: Dict[int, List[Dict[str, Any]]]

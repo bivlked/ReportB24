@@ -456,24 +456,14 @@ class DataProcessor:
         return invoice
 
     def _extract_invoice_number(self, raw_data: Dict[str, Any]) -> Optional[str]:
-        """Извлечение номера счёта"""
+        """Извлечение номера счёта (v2.4.0 - optimized)"""
         possible_keys = ["number", "invoice_number", "ACCOUNT_NUMBER"]
-
-        for key in possible_keys:
-            if key in raw_data and raw_data[key]:
-                return str(raw_data[key]).strip()
-
-        return None
+        return next((str(raw_data[key]).strip() for key in possible_keys if key in raw_data and raw_data[key]), None)
 
     def _process_inn(self, raw_data: Dict[str, Any], invoice: InvoiceData) -> None:
-        """Обработка ИНН"""
+        """Обработка ИНН (v2.4.0 - optimized)"""
         possible_keys = ["inn", "INN", "UF_CRM_INN"]
-        inn_value = None
-
-        for key in possible_keys:
-            if key in raw_data and raw_data[key]:
-                inn_value = raw_data[key]
-                break
+        inn_value = next((raw_data[key] for key in possible_keys if key in raw_data and raw_data[key]), None)
 
         if inn_value:
             result = self.inn_processor.validate_inn(inn_value)
@@ -491,14 +481,9 @@ class DataProcessor:
             invoice.validation_errors.append("ИНН не найден")
 
     def _process_dates(self, raw_data: Dict[str, Any], invoice: InvoiceData) -> None:
-        """Обработка дат"""
+        """Обработка дат (v2.4.0 - optimized)"""
         date_keys = ["date_bill", "DATE_BILL", "created_time"]
-        date_value = None
-
-        for key in date_keys:
-            if key in raw_data and raw_data[key]:
-                date_value = raw_data[key]
-                break
+        date_value = next((raw_data[key] for key in date_keys if key in raw_data and raw_data[key]), None)
 
         if date_value:
             result = self.date_processor.parse_date(date_value)
@@ -513,14 +498,9 @@ class DataProcessor:
                 )
 
     def _process_amounts(self, raw_data: Dict[str, Any], invoice: InvoiceData) -> None:
-        """Обработка сумм"""
+        """Обработка сумм (v2.4.0 - optimized)"""
         amount_keys = ["opportunity", "OPPORTUNITY", "amount"]
-        amount_value = None
-
-        for key in amount_keys:
-            if key in raw_data and raw_data[key] is not None:
-                amount_value = raw_data[key]
-                break
+        amount_value = next((raw_data[key] for key in amount_keys if key in raw_data and raw_data[key] is not None), None)
 
         if amount_value is not None:
             result = self.currency_processor.parse_amount(amount_value)
@@ -546,14 +526,9 @@ class DataProcessor:
             invoice.validation_errors.append("Сумма не найдена")
 
     def _extract_counterparty(self, raw_data: Dict[str, Any]) -> Optional[str]:
-        """Извлечение наименования контрагента"""
+        """Извлечение наименования контрагента (v2.4.0 - optimized)"""
         possible_keys = ["title", "TITLE", "company_title"]
-
-        for key in possible_keys:
-            if key in raw_data and raw_data[key]:
-                return str(raw_data[key]).strip()
-
-        return None
+        return next((str(raw_data[key]).strip() for key in possible_keys if key in raw_data and raw_data[key]), None)
 
     def _validate_invoice(self, invoice: InvoiceData) -> None:
         """Финальная валидация счёта"""

@@ -107,9 +107,8 @@ class TestDataProcessor:
         invoices = processor.process_invoice_batch(raw_data_list)
         
         assert len(invoices) == 2
-        assert all(invoice.inn_valid for invoice in invoices)
-        assert all(invoice.amounts_valid for invoice in invoices)
-        assert all(invoice.dates_valid for invoice in invoices)
+        # ProcessedInvoice использует is_valid вместо отдельных флагов
+        assert all(invoice.is_valid for invoice in invoices)
     
     def test_field_extraction_methods(self, processor):
         """Тест: методы извлечения полей"""
@@ -225,21 +224,25 @@ def test_data_processor_integration():
     """Интеграционный тест DataProcessor"""
     processor = DataProcessor()
     
-    # Реальные данные как могут прийти из Bitrix24
+    # Реальные данные в формате v2.4.0 (camelCase ключи)
     sample_data = [
         {
-            'ACCOUNT_NUMBER': 'С-001/2024',
-            'UF_CRM_INN': '3321035160',
-            'TITLE': 'ООО "ГЕНЕРИУМ-НЕКСТ"',
-            'OPPORTUNITY': '500000.00',
-            'DATE_BILL': '2024-06-15T10:30:00'
+            'accountNumber': 'С-001/2024',
+            'ufCrmInn': '3321035160',
+            'title': 'ООО "ГЕНЕРИУМ-НЕКСТ"',
+            'opportunity': '500000.00',
+            'taxValue': '100000.00',
+            'begindate': '2024-06-15T10:30:00',
+            'closedate': '2024-06-20T00:00:00'
         },
         {
-            'ACCOUNT_NUMBER': 'С-002/2024', 
-            'UF_CRM_INN': '5403339998',
-            'TITLE': 'ООО "САНЗЭЙТРАНС"',
-            'OPPORTUNITY': '1200000',
-            'DATE_BILL': '15.06.2024'
+            'accountNumber': 'С-002/2024', 
+            'ufCrmInn': '5403339998',
+            'title': 'ООО "САНЗЭЙТРАНС"',
+            'opportunity': '1200000',
+            'taxValue': '0',
+            'begindate': '2024-06-15T00:00:00',
+            'closedate': '2024-06-25T00:00:00'
         }
     ]
     
@@ -250,10 +253,58 @@ def test_data_processor_integration():
     assert len(invoices) == 2
     
     for invoice in invoices:
-        assert invoice.inn_valid is True
-        assert invoice.amounts_valid is True
-        assert invoice.dates_valid is True
+        # ProcessedInvoice использует is_valid вместо отдельных флагов
+        assert invoice.is_valid is True
         assert len(invoice.validation_errors) == 0
         assert invoice.amount > 0
         assert invoice.vat_amount is not None
-        assert invoice.vat_amount > 0  # НДС рассчитан 
+        # vat_amount может быть Decimal или "нет"
+        if invoice.vat_amount != "нет":
+            assert invoice.vat_amount > 0  # НДС рассчитан 
+
+    def test_processed_invoice_uses_decimal_types(self, processor):
+        """Тест: ProcessedInvoice использует Decimal для сумм (БАГ-A1)"""
+        raw_data = [
+            {
+                'accountNumber': 'С-002/2024',
+                'ufCrmInn': '5403339998',
+                'title': 'ООО "САНЗЭЙТРАНС"',
+                'opportunity': '1200000.50',  # С копейками!
+                'taxValue': '240000.10',  # Явно указываем НДС
+                'begindate': '2024-06-15T00:00:00',
+                'closedate': '2024-06-20T00:00:00',
+                'stageId': 'DT31_20:WON'
+            }
+        ]
+        
+        result = processor.process_invoice_batch(raw_data)
+        invoice = result[0]
+        
+        # Проверяем что суммы - это Decimal, а не строки
+        assert isinstance(invoice.amount, Decimal)
+        assert invoice.amount == Decimal('1200000.50')
+        
+        # НДС тоже должен быть Decimal когда указан явно
+        assert isinstance(invoice.vat_amount, Decimal)
+        assert invoice.vat_amount == Decimal('240000.10')
+    
+    def test_processed_invoice_handles_no_vat(self, processor):
+        """Тест: ProcessedInvoice корректно обрабатывает "нет" НДС"""
+        raw_data = [
+            {
+                'accountNumber': 'С-003/2024',
+                'ufCrmInn': '3321035160',
+                'title': 'ООО "Без НДС"',
+                'opportunity': '300000',
+                'taxValue': '0',  # НДС = 0
+                'begindate': '2024-06-15T00:00:00',
+                'closedate': '2024-06-20T00:00:00',
+                'stageId': 'DT31_20:WON'
+            }
+        ]
+        
+        result = processor.process_invoice_batch(raw_data)
+        invoice = result[0]
+        
+        # Проверяем что vat_amount="нет" когда taxValue=0
+        assert invoice.vat_amount == "нет" 

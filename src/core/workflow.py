@@ -138,7 +138,7 @@ class WorkflowOrchestrator:
     
     def execute_full_workflow(self, output_file_path: Path) -> WorkflowResult:
         """
-        Выполняет полный workflow генерации отчёта.
+        Выполняет полный workflow генерации отчёта (v2.4.0 - refactored).
         
         Args:
             output_file_path: Путь для сохранения Excel файла
@@ -152,74 +152,26 @@ class WorkflowOrchestrator:
             self.logger.info("Начало выполнения workflow генерации отчёта")
             
             # Этап 1: Инициализация
-            self._update_progress(WorkflowStages.INITIALIZATION, "Подготовка к выполнению")
-            self.logger.info("Этап 1: Инициализация")
+            period_config = self._execute_initialization_stage()
             
-            # Получение конфигурации периода
-            period_config = self.config_reader.get_report_period_config()
-            self.logger.info(f"Период отчёта: {period_config.start_date} - {period_config.end_date}")
-            
-            # Этап 2: Получение данных из Bitrix24
-            self._update_progress(WorkflowStages.DATA_FETCHING, "Получение данных из Bitrix24")
-            self.logger.info("Этап 2: Получение данных из Bitrix24")
-            
-            raw_invoices_data = self._fetch_invoices_data(period_config.start_date, period_config.end_date)
-            self.logger.info(f"Получено счетов: {len(raw_invoices_data)}")
-            
+            # Этап 2: Получение данных
+            raw_invoices_data = self._execute_data_fetching_stage(period_config)
             if not raw_invoices_data:
-                return WorkflowResult(
-                    success=False,
-                    error_message="Не найдено счетов для указанного периода",
-                    execution_time_seconds=(datetime.now() - start_time).total_seconds()
-                )
+                return self._create_error_result("Не найдено счетов для указанного периода", start_time)
             
             # Этап 3: Обработка данных
-            self._update_progress(WorkflowStages.DATA_PROCESSING, "Обработка и валидация данных")
-            self.logger.info("Этап 3: Обработка данных")
-            
-            processed_data = self._process_invoices_data(raw_invoices_data)
-            self.logger.info(f"Обработано записей: {len(processed_data)}")
-            
+            processed_data = self._execute_data_processing_stage(raw_invoices_data)
             if not processed_data:
-                return WorkflowResult(
-                    success=False,
-                    error_message="После обработки не осталось валидных записей",
-                    execution_time_seconds=(datetime.now() - start_time).total_seconds()
-                )
+                return self._create_error_result("После обработки не осталось валидных записей", start_time)
             
-            # Этап 4: Генерация Excel отчёта
-            self._update_progress(WorkflowStages.EXCEL_GENERATION, "Создание Excel отчёта", len(processed_data))
-            self.logger.info("Этап 4: Генерация Excel отчёта")
-            
-            excel_path = self._generate_excel_report(processed_data, output_file_path)
-            self.logger.info(f"Excel отчёт создан: {excel_path}")
+            # Этап 4: Генерация Excel
+            excel_path = self._execute_excel_generation_stage(processed_data, output_file_path)
             
             # Этап 5: Финализация
-            self._update_progress(WorkflowStages.FINALIZATION, "Завершение и проверка результата")
-            self.logger.info("Этап 5: Финализация")
+            result = self._execute_finalization_stage(excel_path, processed_data, start_time)
             
-            # Проверка созданного файла
-            if not excel_path.exists():
-                return WorkflowResult(
-                    success=False,
-                    error_message=f"Excel файл не был создан: {excel_path}",
-                    execution_time_seconds=(datetime.now() - start_time).total_seconds()
-                )
-            
-            # Статистика
-            detailed_stats = self._calculate_detailed_stats(processed_data)
-            
-            execution_time = (datetime.now() - start_time).total_seconds()
-            
-            self.logger.info(f"Workflow завершён успешно за {execution_time:.2f} сек")
-            
-            return WorkflowResult(
-                success=True,
-                records_processed=len(processed_data),
-                excel_file_path=excel_path,
-                execution_time_seconds=execution_time,
-                detailed_stats=detailed_stats
-            )
+            self.logger.info(f"Workflow завершён успешно за {result.execution_time_seconds:.2f} сек")
+            return result
             
         except Exception as e:
             execution_time = (datetime.now() - start_time).total_seconds()
@@ -233,6 +185,84 @@ class WorkflowOrchestrator:
                 error_message=error_message,
                 execution_time_seconds=execution_time
             )
+    
+    def _execute_initialization_stage(self):
+        """Этап 1: Инициализация и получение конфигурации."""
+        self._update_progress(WorkflowStages.INITIALIZATION, "Подготовка к выполнению")
+        self.logger.info("Этап 1: Инициализация")
+        
+        period_config = self.config_reader.get_report_period_config()
+        self.logger.info(f"Период отчёта: {period_config.start_date} - {period_config.end_date}")
+        
+        return period_config
+    
+    def _execute_data_fetching_stage(self, period_config) -> List[Dict[str, Any]]:
+        """Этап 2: Получение данных из Bitrix24."""
+        self._update_progress(WorkflowStages.DATA_FETCHING, "Получение данных из Bitrix24")
+        self.logger.info("Этап 2: Получение данных из Bitrix24")
+        
+        raw_invoices_data = self._fetch_invoices_data(period_config.start_date, period_config.end_date)
+        self.logger.info(f"Получено счетов: {len(raw_invoices_data)}")
+        
+        return raw_invoices_data
+    
+    def _execute_data_processing_stage(self, raw_invoices_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Этап 3: Обработка и валидация данных."""
+        self._update_progress(WorkflowStages.DATA_PROCESSING, "Обработка и валидация данных")
+        self.logger.info("Этап 3: Обработка данных")
+        
+        processed_data = self._process_invoices_data(raw_invoices_data)
+        self.logger.info(f"Обработано записей: {len(processed_data)}")
+        
+        return processed_data
+    
+    def _execute_excel_generation_stage(self, processed_data: List[Dict[str, Any]], output_file_path: Path) -> Path:
+        """Этап 4: Генерация Excel отчёта."""
+        self._update_progress(WorkflowStages.EXCEL_GENERATION, "Создание Excel отчёта", len(processed_data))
+        self.logger.info("Этап 4: Генерация Excel отчёта")
+        
+        excel_path = self._generate_excel_report(processed_data, output_file_path)
+        self.logger.info(f"Excel отчёт создан: {excel_path}")
+        
+        return excel_path
+    
+    def _execute_finalization_stage(
+        self, 
+        excel_path: Path, 
+        processed_data: List[Dict[str, Any]], 
+        start_time: datetime
+    ) -> WorkflowResult:
+        """Этап 5: Финализация и формирование результата."""
+        self._update_progress(WorkflowStages.FINALIZATION, "Завершение и проверка результата")
+        self.logger.info("Этап 5: Финализация")
+        
+        # Проверка созданного файла
+        if not excel_path.exists():
+            return WorkflowResult(
+                success=False,
+                error_message=f"Excel файл не был создан: {excel_path}",
+                execution_time_seconds=(datetime.now() - start_time).total_seconds()
+            )
+        
+        # Статистика
+        detailed_stats = self._calculate_detailed_stats(processed_data)
+        execution_time = (datetime.now() - start_time).total_seconds()
+        
+        return WorkflowResult(
+            success=True,
+            records_processed=len(processed_data),
+            excel_file_path=excel_path,
+            execution_time_seconds=execution_time,
+            detailed_stats=detailed_stats
+        )
+    
+    def _create_error_result(self, error_message: str, start_time: datetime) -> WorkflowResult:
+        """Создает результат с ошибкой."""
+        return WorkflowResult(
+            success=False,
+            error_message=error_message,
+            execution_time_seconds=(datetime.now() - start_time).total_seconds()
+        )
     
     def _fetch_invoices_data(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """
@@ -276,57 +306,19 @@ class WorkflowOrchestrator:
         return start_date_obj, end_date_obj
     
     def _fetch_all_invoices(self) -> List[Dict[str, Any]]:
-        """
-        Получает все Smart Invoices из Bitrix24 (как в ShortReport.py).
-        
-        Returns:
-            List: Список всех счетов без фильтрации
-        """
-        filter_params = {
-            "!stageId": "DT31_1:D"  # исключаем удаленные
-        }
-        
-        # Поля для выборки (точно как в ShortReport.py)
+        """Получает все Smart Invoices из Bitrix24 (как в ShortReport.py)."""
+        filter_params = {"!stageId": "DT31_1:D"}
         select_fields = [
-            'id',
-            'accountNumber',
-            'statusId',
-            'dateBill',
-            'price',
-            'UFCRM_SMART_INVOICE_1651168135187',  # Дата отгрузки
-            'UFCRM_626D6ABE98692',               # Дата оплаты
-            'begindate',
-            'opportunity',
-            'stageId',
-            'taxValue'
+            'id', 'accountNumber', 'statusId', 'dateBill', 'price',
+            'UFCRM_SMART_INVOICE_1651168135187', 'UFCRM_626D6ABE98692',
+            'begindate', 'opportunity', 'stageId', 'taxValue'
         ]
-        
-        return self.bitrix_client.get_smart_invoices(
-            entity_type_id=31,
-            filters=filter_params,
-            select=select_fields
-        )
+        return self.bitrix_client.get_smart_invoices(entity_type_id=31, filters=filter_params, select=select_fields)
     
-    def _filter_invoices_by_date(
-        self, 
-        invoices: List[Dict[str, Any]], 
-        start_date: Any, 
-        end_date: Any
-    ) -> List[Dict[str, Any]]:
-        """
-        Фильтрует счета по дате отгрузки (как в ShortReport.py).
-        
-        Args:
-            invoices: Список всех счетов
-            start_date: Начало периода (date object)
-            end_date: Конец периода (date object)
-            
-        Returns:
-            List: Отфильтрованные счета
-        """
+    def _filter_invoices_by_date(self, invoices: List[Dict[str, Any]], start_date: Any, end_date: Any) -> List[Dict[str, Any]]:
+        """Фильтрует счета по дате отгрузки."""
         from datetime import datetime
         filtered = []
-        
         for inv in invoices:
             ship_date_str = inv.get('UFCRM_SMART_INVOICE_1651168135187')
             if ship_date_str:
@@ -336,51 +328,27 @@ class WorkflowOrchestrator:
                         filtered.append(inv)
                 except ValueError as ex:
                     self.logger.warning(f"Ошибка преобразования даты отгрузки (ID={inv.get('id')}): {ex}")
-        
         return filtered
     
     def _enrich_invoices_with_requisites(self, invoices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Обогащает счета данными реквизитов компаний (как в ShortReport.py).
-        
-        Args:
-            invoices: Список счетов для обогащения
-            
-        Returns:
-            List: Счета с добавленными полями company_name и company_inn
-        """
+        """Обогащает счета данными реквизитов компаний."""
         enriched = []
-        
         for invoice in invoices:
             try:
                 acc_num = invoice.get('accountNumber', '')
-                
-                # Получаем реквизиты компании
                 comp_name, inn = self.bitrix_client.get_company_info_by_invoice(acc_num)
                 if not comp_name and not inn:
                     comp_name, inn = "Не найдено", "Не найдено"
-                
-                # Добавляем реквизиты к данным счета
                 enriched_invoice = invoice.copy()
-                enriched_invoice.update({
-                    'company_name': comp_name,
-                    'company_inn': inn
-                })
-                
+                enriched_invoice.update({'company_name': comp_name, 'company_inn': inn})
                 enriched.append(enriched_invoice)
-                
             except Exception as exp:
                 self.logger.error(f"Ошибка обогащения счёта {invoice.get('id', 'N/A')}: {exp}")
-                # Добавляем без реквизитов
                 enriched_invoice = invoice.copy()
-                enriched_invoice.update({
-                    'company_name': "Ошибка",
-                    'company_inn': "Ошибка"
-                })
+                enriched_invoice.update({'company_name': "Ошибка", 'company_inn': "Ошибка"})
                 enriched.append(enriched_invoice)
-        
         return enriched
-
+    
     # 🔧 v2.4.0: Методы _format_amount, _format_vat_amount, _format_date удалены
     # Форматирование теперь выполняется в DataProcessor и ExcelReportGenerator
 

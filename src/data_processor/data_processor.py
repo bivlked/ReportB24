@@ -543,11 +543,13 @@ class DataProcessor:
             if not getattr(invoice, field):
                 invoice.validation_errors.append(f"Отсутствует {description}")
 
-    def process_invoice_batch(
+    def process_invoice_batch_legacy(
         self, raw_data_list: List[Dict[str, Any]]
     ) -> List[InvoiceData]:
         """
-        Пакетная обработка списка счетов.
+        Пакетная обработка списка счетов (LEGACY).
+        
+        DEPRECATED: Используйте process_invoice_batch() для новой архитектуры v2.4.0.
 
         Args:
             raw_data_list: Список сырых данных счетов

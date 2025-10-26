@@ -169,6 +169,7 @@ class ReportGeneratorApp:
             else:
                 self._log_info("Загрузка конфигурации с ConfigReader...")
                 self.config_reader = ConfigReader(self.config_path)
+                self.config_reader.load_config()  # 🔥 БАГ-1 FIX: явная загрузка конфигурации
                 self._log_info("Конфигурация загружена ✓")
             
             self.status.is_configured = True

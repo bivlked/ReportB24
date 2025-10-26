@@ -331,22 +331,50 @@ class WorkflowOrchestrator:
         return filtered
     
     def _enrich_invoices_with_requisites(self, invoices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Обогащает счета данными реквизитов компаний."""
-        enriched = []
-        for invoice in invoices:
+        """
+        Обогащает счета данными реквизитов компаний (v2.4.0 - optimized).
+        
+        Оптимизация: Запрашивает реквизиты только для уникальных номеров счетов,
+        сокращая количество API запросов с N до K (где K - уникальные счета).
+        """
+        if not invoices:
+            return []
+        
+        # Собираем уникальные номера счетов
+        unique_accounts = set(inv.get('accountNumber', '') for inv in invoices if inv.get('accountNumber'))
+        
+        # Кеш для реквизитов {account_number: (company_name, inn)}
+        requisites_cache = {}
+        
+        # Запрашиваем реквизиты только для уникальных счетов
+        for acc_num in unique_accounts:
             try:
-                acc_num = invoice.get('accountNumber', '')
                 comp_name, inn = self.bitrix_client.get_company_info_by_invoice(acc_num)
                 if not comp_name and not inn:
                     comp_name, inn = "Не найдено", "Не найдено"
-                enriched_invoice = invoice.copy()
-                enriched_invoice.update({'company_name': comp_name, 'company_inn': inn})
-                enriched.append(enriched_invoice)
+                requisites_cache[acc_num] = (comp_name, inn)
             except Exception as exp:
-                self.logger.error(f"Ошибка обогащения счёта {invoice.get('id', 'N/A')}: {exp}")
-                enriched_invoice = invoice.copy()
-                enriched_invoice.update({'company_name': "Ошибка", 'company_inn': "Ошибка"})
-                enriched.append(enriched_invoice)
+                self.logger.error(f"Ошибка получения реквизитов для счета {acc_num}: {exp}")
+                requisites_cache[acc_num] = ("Ошибка", "Ошибка")
+        
+        self.logger.debug(f"Запрошено реквизитов: {len(requisites_cache)} уникальных из {len(invoices)} счетов")
+        
+        # Обогащаем счета из кеша
+        enriched = []
+        for invoice in invoices:
+            acc_num = invoice.get('accountNumber', '')
+            
+            # Получаем реквизиты из кеша
+            if acc_num in requisites_cache:
+                comp_name, inn = requisites_cache[acc_num]
+            else:
+                comp_name, inn = "Не найдено", "Не найдено"
+            
+            # Создаем обогащенную копию
+            enriched_invoice = invoice.copy()
+            enriched_invoice.update({'company_name': comp_name, 'company_inn': inn})
+            enriched.append(enriched_invoice)
+        
         return enriched
     
     # 🔧 v2.4.0: Методы _format_amount, _format_vat_amount, _format_date удалены

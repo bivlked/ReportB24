@@ -184,6 +184,7 @@ class TestBugA2Integration:
         result = processor.process_invoice_batch(raw_data)
         
         assert len(result) == 1
-        # ИНН и контрагент будут из прямых полей, не из API
-        assert result[0].inn == "Не найдено"  # Из прямых полей
+        # ИНН будет извлечен из ufCrmInn (fallback), контрагент из title
+        assert result[0].inn == '3321035160'  # Из ufCrmInn fallback
         assert result[0].counterparty == 'ООО "Тест"'  # Из title
+        assert result[0].is_valid is True  # Данные валидны

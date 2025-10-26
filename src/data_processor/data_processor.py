@@ -253,7 +253,30 @@ class DataProcessor:
         if not inn:
             inn = 'Не найдено'
         
-        # Валидация
+        # Валидация данных
+        validation_errors = []
+        is_valid = True
+        
+        # Проверка критичных полей
+        if not account_number or account_number.strip() == '':
+            validation_errors.append('Отсутствует номер счета')
+            is_valid = False
+        
+        if inn in ['Не найдено', 'не указан', 'ERROR'] or not inn:
+            validation_errors.append('ИНН не найден или некорректен')
+            is_valid = False
+        else:
+            # Проверка валидности ИНН через InnProcessor
+            inn_result = self.inn_processor.validate_inn(inn)
+            if not inn_result.is_valid:
+                validation_errors.append(f'ИНН невалиден: {inn_result.error}')
+                is_valid = False
+        
+        if amount <= Decimal('0'):
+            validation_errors.append('Сумма счета должна быть больше нуля')
+            is_valid = False
+        
+        # Дополнительная валидация
         is_unpaid = payment_date is None
         
         return ProcessedInvoice(
@@ -265,7 +288,9 @@ class DataProcessor:
             invoice_date=invoice_date or datetime.now(),
             shipping_date=shipping_date or datetime.now(),
             payment_date=payment_date,
-            is_unpaid=is_unpaid
+            is_unpaid=is_unpaid,
+            is_valid=is_valid,
+            validation_errors=validation_errors
         )
     
     def _parse_date(self, date_str: Optional[str]) -> Optional[datetime]:
@@ -342,7 +367,8 @@ class DataProcessor:
         🔧 ИСПРАВЛЕНИЕ: Извлечение ИНН для Smart Invoice через реквизиты
 
         Для получения ИНН используется номер счета (accountNumber)
-        и метод get_company_info_by_invoice() из Bitrix24Client
+        и метод get_company_info_by_invoice() из Bitrix24Client.
+        Если клиент недоступен, используется fallback на прямое поле ufCrmInn.
         """
         account_number = raw_data.get("accountNumber", "")
         # 🔧 БАГ-A2: Правильная проверка клиента (is not None вместо hasattr)
@@ -351,21 +377,20 @@ class DataProcessor:
                 company_name, inn = self._bitrix_client.get_company_info_by_invoice(
                     account_number
                 )
-                return (
-                    inn
-                    if inn
-                    not in [
-                        "Не найдено",
-                        "Ошибка",
-                        "Нет реквизитов",
-                        "Некорректный реквизит",
-                        "Ошибка реквизита",
-                    ]
-                    else ""
-                )
+                if inn and inn not in [
+                    "Не найдено",
+                    "Ошибка",
+                    "Нет реквизитов",
+                    "Некорректный реквизит",
+                    "Ошибка реквизита",
+                ]:
+                    return inn
             except Exception as e:
                 logger.warning(f"Ошибка получения ИНН для счета {account_number}: {e}")
-        return ""
+        
+        # Fallback: прямое извлечение из ufCrmInn (для тестов и резервного варианта)
+        fallback_inn = raw_data.get("ufCrmInn", "")
+        return fallback_inn if fallback_inn else ""
 
     def _extract_smart_invoice_counterparty(self, raw_data: Dict[str, Any]) -> str:
         """

@@ -89,18 +89,24 @@ class TestDataProcessor:
         """Тест: пакетная обработка счетов"""
         raw_data_list = [
             {
-                'ACCOUNT_NUMBER': 'С-1',
-                'UF_CRM_INN': '3321035160',
-                'TITLE': 'ООО "Компания 1"',
-                'OPPORTUNITY': '100000',
-                'DATE_BILL': '15.06.2024'
+                'accountNumber': 'С-1',
+                'ufCrmInn': '3321035160',
+                'title': 'ООО "Компания 1"',
+                'opportunity': '100000',
+                'taxValue': '20000',
+                'begindate': '2024-06-15T00:00:00',
+                'closedate': '2024-06-20T00:00:00',
+                'stageId': 'DT31_20:WON'
             },
             {
-                'ACCOUNT_NUMBER': 'С-2',
-                'UF_CRM_INN': '5403339998',
-                'TITLE': 'ООО "Компания 2"',
-                'OPPORTUNITY': '200000',
-                'DATE_BILL': '16.06.2024'
+                'accountNumber': 'С-2',
+                'ufCrmInn': '5403339998',
+                'title': 'ООО "Компания 2"',
+                'opportunity': '200000',
+                'taxValue': '40000',
+                'begindate': '2024-06-16T00:00:00',
+                'closedate': '2024-06-21T00:00:00',
+                'stageId': 'DT31_20:WON'
             }
         ]
         
@@ -109,6 +115,9 @@ class TestDataProcessor:
         assert len(invoices) == 2
         # ProcessedInvoice использует is_valid вместо отдельных флагов
         assert all(invoice.is_valid for invoice in invoices)
+        # Проверяем что ИНН извлечены из fallback поля
+        assert invoices[0].inn == '3321035160'
+        assert invoices[1].inn == '5403339998'
     
     def test_field_extraction_methods(self, processor):
         """Тест: методы извлечения полей"""

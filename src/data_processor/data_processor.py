@@ -12,6 +12,7 @@ import logging
 from .inn_processor import INNProcessor
 from .date_processor import DateProcessor
 from .currency_processor import CurrencyProcessor
+from .validation_helpers import safe_decimal, safe_float  # БАГ-2 FIX
 
 logger = logging.getLogger(__name__)
 
@@ -234,11 +235,11 @@ class DataProcessor:
         # Извлечение и валидация данных
         account_number = invoice.get('accountNumber', '')
         
-        # Обработка сумм (ЧИСЛОВЫЕ типы!)
-        amount = Decimal(str(invoice.get('opportunity', 0)))
-        tax_val = float(invoice.get('taxValue', 0))
-        vat_amount = Decimal(str(tax_val)) if tax_val > 0 else "нет"
-        
+        # 🔥 БАГ-2 FIX: Безопасная обработка сумм с валидацией
+        amount = safe_decimal(invoice.get('opportunity'), '0')
+        tax_val = safe_float(invoice.get('taxValue'), 0.0)
+        vat_amount = safe_decimal(tax_val, '0') if tax_val > 0 else "нет"
+
         # Обработка дат (используем DateProcessor)
         invoice_date = self._parse_date(invoice.get('begindate'))
         shipping_date = self._parse_date(invoice.get('UFCRM_SMART_INVOICE_1651168135187'))

@@ -71,13 +71,35 @@ class ProcessedInvoice:
     is_valid: bool = True
     validation_errors: List[str] = field(default_factory=list)
     
+    def _determine_vat_rate(self) -> str:
+        """
+        🔥 БАГ-4 FIX: Определение ставки НДС для корректной статистики.
+        
+        Returns:
+            "no_vat" - нет НДС (vat_amount == "нет" или vat_amount == 0)
+            "with_vat" - есть НДС (vat_amount > 0)
+        
+        Note:
+            Товары с НДС=0% должны классифицироваться как "no_vat",
+            а не "with_vat" (критично для корректной статистики).
+        """
+        if isinstance(self.vat_amount, str):
+            return "no_vat"  # vat_amount == "нет"
+        
+        if isinstance(self.vat_amount, Decimal):
+            return "no_vat" if self.vat_amount == Decimal('0') else "with_vat"
+        
+        # Fallback для неожиданных типов
+        return "no_vat"
+    
     def to_dict(self) -> Dict[str, Any]:
         """
         Конвертация в dict для передачи в Excel генератор.
         Даты форматируются в строки, суммы остаются Decimal.
         """
-        # Определяем признак отсутствия НДС
-        is_no_vat = isinstance(self.vat_amount, str) and self.vat_amount == "нет"
+        # 🔥 БАГ-4 FIX: Используем _determine_vat_rate() для корректной классификации
+        vat_status = self._determine_vat_rate()
+        is_no_vat = (vat_status == "no_vat")
         
         return {
             'account_number': self.account_number,

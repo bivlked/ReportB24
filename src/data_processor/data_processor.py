@@ -12,6 +12,7 @@ import logging
 from .inn_processor import INNProcessor
 from .date_processor import DateProcessor
 from .currency_processor import CurrencyProcessor
+from .validation_helpers import safe_decimal, safe_float  # БАГ-2 FIX
 
 logger = logging.getLogger(__name__)
 
@@ -70,13 +71,35 @@ class ProcessedInvoice:
     is_valid: bool = True
     validation_errors: List[str] = field(default_factory=list)
     
+    def _determine_vat_rate(self) -> str:
+        """
+        🔥 БАГ-4 FIX: Определение ставки НДС для корректной статистики.
+        
+        Returns:
+            "no_vat" - нет НДС (vat_amount == "нет" или vat_amount == 0)
+            "with_vat" - есть НДС (vat_amount > 0)
+        
+        Note:
+            Товары с НДС=0% должны классифицироваться как "no_vat",
+            а не "with_vat" (критично для корректной статистики).
+        """
+        if isinstance(self.vat_amount, str):
+            return "no_vat"  # vat_amount == "нет"
+        
+        if isinstance(self.vat_amount, Decimal):
+            return "no_vat" if self.vat_amount == Decimal('0') else "with_vat"
+        
+        # Fallback для неожиданных типов
+        return "no_vat"
+    
     def to_dict(self) -> Dict[str, Any]:
         """
         Конвертация в dict для передачи в Excel генератор.
         Даты форматируются в строки, суммы остаются Decimal.
         """
-        # Определяем признак отсутствия НДС
-        is_no_vat = isinstance(self.vat_amount, str) and self.vat_amount == "нет"
+        # 🔥 БАГ-4 FIX: Используем _determine_vat_rate() для корректной классификации
+        vat_status = self._determine_vat_rate()
+        is_no_vat = (vat_status == "no_vat")
         
         return {
             'account_number': self.account_number,
@@ -234,11 +257,11 @@ class DataProcessor:
         # Извлечение и валидация данных
         account_number = invoice.get('accountNumber', '')
         
-        # Обработка сумм (ЧИСЛОВЫЕ типы!)
-        amount = Decimal(str(invoice.get('opportunity', 0)))
-        tax_val = float(invoice.get('taxValue', 0))
-        vat_amount = Decimal(str(tax_val)) if tax_val > 0 else "нет"
-        
+        # 🔥 БАГ-2 FIX: Безопасная обработка сумм с валидацией
+        amount = safe_decimal(invoice.get('opportunity'), '0')
+        tax_val = safe_float(invoice.get('taxValue'), 0.0)
+        vat_amount = safe_decimal(tax_val, '0') if tax_val > 0 else "нет"
+
         # Обработка дат (используем DateProcessor)
         invoice_date = self._parse_date(invoice.get('begindate'))
         shipping_date = self._parse_date(invoice.get('UFCRM_SMART_INVOICE_1651168135187'))
@@ -324,9 +347,9 @@ class DataProcessor:
             Dict[str, Any]: Обработанные данные в формате для Excel
         """
         try:
-            # Извлекаем данные из Smart Invoice структуры
-            tax_val = float(raw_data.get("taxValue", 0))
-            amount_val = float(raw_data.get("opportunity", 0))
+            # 🔥 БАГ-6 FIX: Безопасная обработка сумм с валидацией
+            tax_val = safe_float(raw_data.get("taxValue"), 0.0)
+            amount_val = safe_float(raw_data.get("opportunity"), 0.0)
 
             # Форматированные строки для отображения
             tax_text = "нет" if tax_val == 0 else self._format_amount(tax_val)
@@ -365,13 +388,30 @@ class DataProcessor:
     def _extract_smart_invoice_inn(self, raw_data: Dict[str, Any]) -> str:
         """
         🔧 ИСПРАВЛЕНИЕ: Извлечение ИНН для Smart Invoice через реквизиты
-
-        Для получения ИНН используется номер счета (accountNumber)
-        и метод get_company_info_by_invoice() из Bitrix24Client.
-        Если клиент недоступен, используется fallback на прямое поле ufCrmInn.
+        
+        🔥 БАГ-8 FIX: Сначала проверяем обогащенные данные из WorkflowOrchestrator!
+        
+        Приоритет:
+        1. Обогащенные данные: raw_data['company_inn'] (из Workflow)
+        2. API запрос: get_company_info_by_invoice() (только если данных нет)
+        3. Fallback: ufCrmInn (резервный вариант)
+        
+        Performance: Снижение API запросов с 3x до 1x (66% улучшение)
         """
+        # 🔥 БАГ-8 FIX: PRIORITY 1 - Используем обогащенные данные
+        enriched_inn = raw_data.get("company_inn", "").strip()
+        if enriched_inn and enriched_inn not in [
+            "Не найдено",
+            "Ошибка",
+            "Нет реквизитов",
+            "Некорректный реквизит",
+            "Ошибка реквизита",
+        ]:
+            logger.debug(f"✅ БАГ-8: Использованы обогащенные данные ИНН (пропущен API запрос)")
+            return enriched_inn
+        
+        # PRIORITY 2 - API запрос (только если данных нет)
         account_number = raw_data.get("accountNumber", "")
-        # 🔧 БАГ-A2: Правильная проверка клиента (is not None вместо hasattr)
         if account_number and self._bitrix_client is not None:
             try:
                 company_name, inn = self._bitrix_client.get_company_info_by_invoice(
@@ -384,40 +424,55 @@ class DataProcessor:
                     "Некорректный реквизит",
                     "Ошибка реквизита",
                 ]:
+                    logger.info(f"⚠️ БАГ-8: API запрос ИНН (данные не были обогащены)")
                     return inn
             except Exception as e:
                 logger.warning(f"Ошибка получения ИНН для счета {account_number}: {e}")
         
-        # Fallback: прямое извлечение из ufCrmInn (для тестов и резервного варианта)
+        # PRIORITY 3 - Fallback: прямое извлечение из ufCrmInn
         fallback_inn = raw_data.get("ufCrmInn", "")
         return fallback_inn if fallback_inn else ""
 
     def _extract_smart_invoice_counterparty(self, raw_data: Dict[str, Any]) -> str:
         """
         🔧 ИСПРАВЛЕНИЕ: Извлечение названия контрагента для Smart Invoice через реквизиты
-
-        Для получения названия контрагента используется номер счета (accountNumber)
-        и метод get_company_info_by_invoice() из Bitrix24Client
+        
+        🔥 БАГ-8 FIX: Сначала проверяем обогащенные данные из WorkflowOrchestrator!
+        
+        Приоритет:
+        1. Обогащенные данные: raw_data['company_name'] (из Workflow)
+        2. API запрос: get_company_info_by_invoice() (только если данных нет)
+        
+        Performance: Снижение API запросов с 3x до 1x (66% улучшение)
         """
+        # 🔥 БАГ-8 FIX: PRIORITY 1 - Используем обогащенные данные
+        enriched_name = raw_data.get("company_name", "").strip()
+        if enriched_name and enriched_name not in [
+            "Не найдено",
+            "Ошибка",
+            "Нет реквизитов",
+            "Некорректный реквизит",
+            "Ошибка реквизита",
+        ]:
+            logger.debug(f"✅ БАГ-8: Использованы обогащенные данные контрагента (пропущен API запрос)")
+            return enriched_name
+        
+        # PRIORITY 2 - API запрос (только если данных нет)
         account_number = raw_data.get("accountNumber", "")
-        # 🔧 БАГ-A2: Правильная проверка клиента (is not None вместо hasattr)
         if account_number and self._bitrix_client is not None:
             try:
                 company_name, inn = self._bitrix_client.get_company_info_by_invoice(
                     account_number
                 )
-                return (
-                    company_name
-                    if company_name
-                    not in [
-                        "Не найдено",
-                        "Ошибка",
-                        "Нет реквизитов",
-                        "Некорректный реквизит",
-                        "Ошибка реквизита",
-                    ]
-                    else ""
-                )
+                if company_name and company_name not in [
+                    "Не найдено",
+                    "Ошибка",
+                    "Нет реквизитов",
+                    "Некорректный реквизит",
+                    "Ошибка реквизита",
+                ]:
+                    logger.info(f"⚠️ БАГ-8: API запрос контрагента (данные не были обогащены)")
+                    return company_name
             except Exception as e:
                 logger.warning(
                     f"Ошибка получения контрагента для счета {account_number}: {e}"
@@ -741,15 +796,15 @@ class DataProcessor:
         if tax_rate == 20:
             # Специальная российская логика НДС 20% (по образцу Report BIG.py)
             # ВАЖНО: Report BIG.py ВСЕГДА использует формулу /1.2 * 0.2 независимо от tax_included
-            price = float(raw_product.get("price", 0))
-            quantity = float(raw_product.get("quantity", 0))
+            price = safe_float(product.price, 0.0)  # БАГ-7 FIX: валидированные данные
+            quantity = safe_float(product.quantity, 0.0)  # БАГ-7 FIX
             total_amount = price * quantity
 
             # Формула Report BIG.py: ВСЕГДА (price * qty) / 1.2 * 0.2 (игнорируем tax_included)
             # ОПТИМИЗАЦИЯ: /1.2 * 0.2 = 1/6, используем более эффективную формулу
             vat_amount = total_amount / 6
 
-            product.vat_amount = Decimal(str(round(vat_amount, 2)))
+            product.vat_amount = safe_decimal(round(vat_amount, 2), '0')  # БАГ-6 FIX
             product.vat_rate = "20%"
             product.formatted_vat = f"{vat_amount:,.2f}".replace(",", " ").replace(".", ",")
         elif tax_rate and tax_rate > 0:
@@ -962,7 +1017,7 @@ class DataProcessor:
                     "company_name": invoice_info.get("company_name", "Не найдено"),
                     "inn": invoice_info.get("inn", "Не найдено"),
                     "product_name": product_data.product_name,
-                    "quantity": int(float(product_data.quantity)),  # Число, не строка
+                    "quantity": float(product_data.quantity),  # 🔥 БАГ-9 FIX: Сохраняем дробные количества
                     "unit_measure": product_data.unit_measure,
                     "price": float(product_data.price),  # Число, не строка
                     "total_amount": float(

@@ -156,8 +156,9 @@ class ErrorHandler:
             self._save_error_report(error_context)
         
         # Повторное выбрасывание при необходимости
+        # БАГ-2 FIX: Bare raise сохраняет оригинальный стек вызовов
         if reraise:
-            raise error
+            raise  # Не raise error! Bare raise сохраняет traceback
         
         return error_context
     

@@ -995,7 +995,7 @@ class DataProcessor:
                     "company_name": invoice_info.get("company_name", "Не найдено"),
                     "inn": invoice_info.get("inn", "Не найдено"),
                     "product_name": product_data.product_name,
-                    "quantity": int(float(product_data.quantity)),  # Число, не строка
+                    "quantity": float(product_data.quantity),  # 🔥 БАГ-9 FIX: Сохраняем дробные количества
                     "unit_measure": product_data.unit_measure,
                     "price": float(product_data.price),  # Число, не строка
                     "total_amount": float(

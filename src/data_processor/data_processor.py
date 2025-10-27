@@ -54,6 +54,9 @@ class ProcessedInvoice:
     
     Используется в новой гибридной архитектуре для batch обработки.
     Все суммы хранятся как Decimal для корректного форматирования в Excel.
+    
+    🔥 БАГ-8 FIX: invoice_date и shipping_date теперь Optional[datetime].
+    Отсутствующие даты НЕ подменяются на datetime.now(), чтобы не искажать данные.
     """
     
     # Основные поля
@@ -62,8 +65,8 @@ class ProcessedInvoice:
     counterparty: str
     amount: Decimal  # Числовой тип для Excel!
     vat_amount: Decimal | str  # Decimal или "нет"
-    invoice_date: datetime
-    shipping_date: datetime
+    invoice_date: Optional[datetime]  # БАГ-8 FIX: Optional для честных данных
+    shipping_date: Optional[datetime]  # БАГ-8 FIX: Optional для честных данных
     payment_date: Optional[datetime]
     
     # Метаданные
@@ -226,15 +229,15 @@ class DataProcessor:
                 processed.append(processed_invoice)
             except Exception as e:
                 logger.error(f"Ошибка обработки счета {invoice.get('id', 'N/A')}: {e}")
-                # Создаем invalid invoice для логирования
+                # БАГ-8 FIX: Создаем invalid invoice с None для дат (не подменяем)
                 invalid = ProcessedInvoice(
                     account_number=invoice.get('accountNumber', 'N/A'),
                     inn='ERROR',
                     counterparty='ERROR',
                     amount=Decimal('0'),
                     vat_amount='ERROR',
-                    invoice_date=datetime.now(),
-                    shipping_date=datetime.now(),
+                    invoice_date=None,  # БАГ-8 FIX: None вместо datetime.now()
+                    shipping_date=None,  # БАГ-8 FIX: None вместо datetime.now()
                     payment_date=None,
                     is_unpaid=True,
                     is_valid=False,
@@ -299,6 +302,15 @@ class DataProcessor:
             validation_errors.append('Сумма счета должна быть больше нуля')
             is_valid = False
         
+        # БАГ-8 FIX: Валидация дат - отсутствующие даты помечаются как ошибка
+        if invoice_date is None:
+            validation_errors.append('Отсутствует дата счета')
+            is_valid = False
+        
+        if shipping_date is None:
+            validation_errors.append('Отсутствует дата отгрузки')
+            is_valid = False
+        
         # Дополнительная валидация
         is_unpaid = payment_date is None
         
@@ -308,8 +320,8 @@ class DataProcessor:
             counterparty=counterparty,
             amount=amount,
             vat_amount=vat_amount,
-            invoice_date=invoice_date or datetime.now(),
-            shipping_date=shipping_date or datetime.now(),
+            invoice_date=invoice_date,  # БАГ-8 FIX: НЕ подменяем None на datetime.now()
+            shipping_date=shipping_date,  # БАГ-8 FIX: НЕ подменяем None на datetime.now()
             payment_date=payment_date,
             is_unpaid=is_unpaid,
             is_valid=is_valid,

@@ -100,8 +100,9 @@ class Bitrix24Client:
         if not webhook_url or "https://" not in webhook_url:
             return webhook_url
 
-        # Маскируем токен в URL: https://portal.bitrix24.ru/rest/12345/abc123def456 -> https://portal.bitrix24.ru/rest/12345/***/
-        masked = re.sub(r"(/rest/\d+/)[a-zA-Z0-9_]+(/?)$", r"\1***/\2", webhook_url)
+        # Маскируем токен в URL: https://portal.bitrix24.ru/rest/12345/abc123def456/ -> https://portal.bitrix24.ru/rest/12345/***/
+        # Удаляем trailing slash перед маскировкой, чтобы избежать двойного слэша
+        masked = re.sub(r"(/rest/\d+/)[a-zA-Z0-9_]+/?$", r"\1***/", webhook_url)
         return masked
 
     def _make_request(

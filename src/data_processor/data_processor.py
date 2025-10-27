@@ -399,7 +399,8 @@ class DataProcessor:
         Performance: Снижение API запросов с 3x до 1x (66% улучшение)
         """
         # 🔥 БАГ-8 FIX: PRIORITY 1 - Используем обогащенные данные
-        enriched_inn = raw_data.get("company_inn", "").strip()
+        # БАГ-4 FIX: Проверка на None перед .strip()
+        enriched_inn = (raw_data.get("company_inn") or "").strip()
         if enriched_inn and enriched_inn not in [
             "Не найдено",
             "Ошибка",
@@ -446,7 +447,8 @@ class DataProcessor:
         Performance: Снижение API запросов с 3x до 1x (66% улучшение)
         """
         # 🔥 БАГ-8 FIX: PRIORITY 1 - Используем обогащенные данные
-        enriched_name = raw_data.get("company_name", "").strip()
+        # БАГ-4 FIX: Проверка на None перед .strip()
+        enriched_name = (raw_data.get("company_name") or "").strip()
         if enriched_name and enriched_name not in [
             "Не найдено",
             "Ошибка",

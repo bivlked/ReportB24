@@ -502,26 +502,6 @@ class APIDataCache:
         else:
             return "Требует оптимизации"
 
-    def print_cache_report(self) -> None:
-        """Вывод детального отчета о состоянии кэша"""
-        stats = self.get_cache_stats()
-
-        print("\n" + "=" * 50)
-        print("📊 ОТЧЕТ О СОСТОЯНИИ API CACHE")
-        print("=" * 50)
-        print(f"🎯 Hit Rate: {stats['hit_rate_percent']}%")
-        print(f"✅ Попаданий: {stats['total_hits']}")
-        print(f"❌ Промахов: {stats['total_misses']}")
-        print(f"📈 Всего запросов: {stats['total_requests']}")
-        print(f"⏱️ Время работы: {stats['uptime_minutes']} мин")
-        print(f"🧠 Эффективность: {stats['memory_efficiency']}")
-
-        print("\n📦 РАЗМЕРЫ КЭШЕЙ:")
-        for cache_type, size in stats["cache_sizes"].items():
-            print(f"  • {cache_type}: {size} записей")
-
-        print("=" * 50)
-
 
 # Глобальный экземпляр кэша для использования в приложении
 _global_cache: Optional[APIDataCache] = None

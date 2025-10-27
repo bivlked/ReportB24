@@ -27,8 +27,7 @@ from .workflow import (
     WorkflowOrchestrator,
     WorkflowResult,
     WorkflowProgress,
-    WorkflowStages,
-    ProgressTracker
+    WorkflowStages
 )
 
 __all__ = [
@@ -53,6 +52,5 @@ __all__ = [
     'WorkflowOrchestrator',
     'WorkflowResult',
     'WorkflowProgress',
-    'WorkflowStages',
-    'ProgressTracker'
+    'WorkflowStages'
 ] 

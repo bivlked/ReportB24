@@ -557,30 +557,4 @@ class WorkflowOrchestrator:
             self.logger.info("Очистка WorkflowOrchestrator завершена")
             
         except Exception as e:
-            handle_error(e, "cleanup", "WorkflowOrchestrator")
-
-
-class ProgressTracker:
-    """Трекер прогресса для workflow."""
-    
-    def __init__(self):
-        self.progress_history: List[WorkflowProgress] = []
-    
-    def track_progress(self, progress: WorkflowProgress) -> None:
-        """Отслеживает изменения прогресса."""
-        self.progress_history.append(progress)
-        print(f"🔄 {progress.current_stage}: {progress.current_operation} "
-              f"({progress.progress_percent:.1f}%)")
-    
-    def get_progress_summary(self) -> Dict[str, Any]:
-        """Возвращает сводку по прогрессу."""
-        if not self.progress_history:
-            return {"stages_completed": 0, "total_time": 0}
-        
-        return {
-            "stages_completed": len(set(p.current_stage for p in self.progress_history)),
-            "total_operations": len(self.progress_history),
-            "last_stage": self.progress_history[-1].current_stage,
-            "last_operation": self.progress_history[-1].current_operation,
-            "records_processed": self.progress_history[-1].records_processed
-        } 
+            handle_error(e, "cleanup", "WorkflowOrchestrator") 

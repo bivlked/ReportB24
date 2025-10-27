@@ -235,38 +235,6 @@ class TestEndToEndWorkflow:
             
         finally:
             Path(temp_config).unlink()
-    
-    def test_workflow_progress_tracking(self):
-        """Тест отслеживания прогресса workflow."""
-        from src.core.workflow import ProgressTracker
-        
-        tracker = ProgressTracker()
-        
-        # Имитация прогресса
-        from src.core.workflow import WorkflowProgress
-        
-        progress1 = WorkflowProgress(
-            current_stage=WorkflowStages.INITIALIZATION,
-            stages_completed=0,
-            total_stages=5,
-            current_operation="Инициализация"
-        )
-        
-        progress2 = WorkflowProgress(
-            current_stage=WorkflowStages.DATA_FETCHING,
-            stages_completed=1,
-            total_stages=5,
-            current_operation="Получение данных"
-        )
-        
-        tracker.track_progress(progress1)
-        tracker.track_progress(progress2)
-        
-        # Проверка сводки прогресса
-        summary = tracker.get_progress_summary()
-        assert summary['stages_completed'] == 2
-        assert summary['total_operations'] == 2
-        assert summary['last_stage'] == WorkflowStages.DATA_FETCHING
 
 
 class TestIntegrationErrorScenarios:

@@ -325,9 +325,9 @@ class DataProcessor:
             Dict[str, Any]: Обработанные данные в формате для Excel
         """
         try:
-            # Извлекаем данные из Smart Invoice структуры
-            tax_val = float(raw_data.get("taxValue", 0))
-            amount_val = float(raw_data.get("opportunity", 0))
+            # 🔥 БАГ-6 FIX: Безопасная обработка сумм с валидацией
+            tax_val = safe_float(raw_data.get("taxValue"), 0.0)
+            amount_val = safe_float(raw_data.get("opportunity"), 0.0)
 
             # Форматированные строки для отображения
             tax_text = "нет" if tax_val == 0 else self._format_amount(tax_val)
@@ -742,15 +742,15 @@ class DataProcessor:
         if tax_rate == 20:
             # Специальная российская логика НДС 20% (по образцу Report BIG.py)
             # ВАЖНО: Report BIG.py ВСЕГДА использует формулу /1.2 * 0.2 независимо от tax_included
-            price = float(raw_product.get("price", 0))
-            quantity = float(raw_product.get("quantity", 0))
+            price = safe_float(product.price, 0.0)  # БАГ-7 FIX: валидированные данные
+            quantity = safe_float(product.quantity, 0.0)  # БАГ-7 FIX
             total_amount = price * quantity
 
             # Формула Report BIG.py: ВСЕГДА (price * qty) / 1.2 * 0.2 (игнорируем tax_included)
             # ОПТИМИЗАЦИЯ: /1.2 * 0.2 = 1/6, используем более эффективную формулу
             vat_amount = total_amount / 6
 
-            product.vat_amount = Decimal(str(round(vat_amount, 2)))
+            product.vat_amount = safe_decimal(round(vat_amount, 2), '0')  # БАГ-6 FIX
             product.vat_rate = "20%"
             product.formatted_vat = f"{vat_amount:,.2f}".replace(",", " ").replace(".", ",")
         elif tax_rate and tax_rate > 0:

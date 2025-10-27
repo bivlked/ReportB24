@@ -292,7 +292,7 @@ class DataProcessor:
             # Проверка валидности ИНН через InnProcessor
             inn_result = self.inn_processor.validate_inn(inn)
             if not inn_result.is_valid:
-                validation_errors.append(f'ИНН невалиден: {inn_result.error}')
+                validation_errors.append(f'ИНН невалиден: {inn_result.error_message}')
                 is_valid = False
         
         if amount <= Decimal('0'):

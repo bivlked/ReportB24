@@ -366,13 +366,30 @@ class DataProcessor:
     def _extract_smart_invoice_inn(self, raw_data: Dict[str, Any]) -> str:
         """
         🔧 ИСПРАВЛЕНИЕ: Извлечение ИНН для Smart Invoice через реквизиты
-
-        Для получения ИНН используется номер счета (accountNumber)
-        и метод get_company_info_by_invoice() из Bitrix24Client.
-        Если клиент недоступен, используется fallback на прямое поле ufCrmInn.
+        
+        🔥 БАГ-8 FIX: Сначала проверяем обогащенные данные из WorkflowOrchestrator!
+        
+        Приоритет:
+        1. Обогащенные данные: raw_data['company_inn'] (из Workflow)
+        2. API запрос: get_company_info_by_invoice() (только если данных нет)
+        3. Fallback: ufCrmInn (резервный вариант)
+        
+        Performance: Снижение API запросов с 3x до 1x (66% улучшение)
         """
+        # 🔥 БАГ-8 FIX: PRIORITY 1 - Используем обогащенные данные
+        enriched_inn = raw_data.get("company_inn", "").strip()
+        if enriched_inn and enriched_inn not in [
+            "Не найдено",
+            "Ошибка",
+            "Нет реквизитов",
+            "Некорректный реквизит",
+            "Ошибка реквизита",
+        ]:
+            logger.debug(f"✅ БАГ-8: Использованы обогащенные данные ИНН (пропущен API запрос)")
+            return enriched_inn
+        
+        # PRIORITY 2 - API запрос (только если данных нет)
         account_number = raw_data.get("accountNumber", "")
-        # 🔧 БАГ-A2: Правильная проверка клиента (is not None вместо hasattr)
         if account_number and self._bitrix_client is not None:
             try:
                 company_name, inn = self._bitrix_client.get_company_info_by_invoice(
@@ -385,40 +402,55 @@ class DataProcessor:
                     "Некорректный реквизит",
                     "Ошибка реквизита",
                 ]:
+                    logger.info(f"⚠️ БАГ-8: API запрос ИНН (данные не были обогащены)")
                     return inn
             except Exception as e:
                 logger.warning(f"Ошибка получения ИНН для счета {account_number}: {e}")
         
-        # Fallback: прямое извлечение из ufCrmInn (для тестов и резервного варианта)
+        # PRIORITY 3 - Fallback: прямое извлечение из ufCrmInn
         fallback_inn = raw_data.get("ufCrmInn", "")
         return fallback_inn if fallback_inn else ""
 
     def _extract_smart_invoice_counterparty(self, raw_data: Dict[str, Any]) -> str:
         """
         🔧 ИСПРАВЛЕНИЕ: Извлечение названия контрагента для Smart Invoice через реквизиты
-
-        Для получения названия контрагента используется номер счета (accountNumber)
-        и метод get_company_info_by_invoice() из Bitrix24Client
+        
+        🔥 БАГ-8 FIX: Сначала проверяем обогащенные данные из WorkflowOrchestrator!
+        
+        Приоритет:
+        1. Обогащенные данные: raw_data['company_name'] (из Workflow)
+        2. API запрос: get_company_info_by_invoice() (только если данных нет)
+        
+        Performance: Снижение API запросов с 3x до 1x (66% улучшение)
         """
+        # 🔥 БАГ-8 FIX: PRIORITY 1 - Используем обогащенные данные
+        enriched_name = raw_data.get("company_name", "").strip()
+        if enriched_name and enriched_name not in [
+            "Не найдено",
+            "Ошибка",
+            "Нет реквизитов",
+            "Некорректный реквизит",
+            "Ошибка реквизита",
+        ]:
+            logger.debug(f"✅ БАГ-8: Использованы обогащенные данные контрагента (пропущен API запрос)")
+            return enriched_name
+        
+        # PRIORITY 2 - API запрос (только если данных нет)
         account_number = raw_data.get("accountNumber", "")
-        # 🔧 БАГ-A2: Правильная проверка клиента (is not None вместо hasattr)
         if account_number and self._bitrix_client is not None:
             try:
                 company_name, inn = self._bitrix_client.get_company_info_by_invoice(
                     account_number
                 )
-                return (
-                    company_name
-                    if company_name
-                    not in [
-                        "Не найдено",
-                        "Ошибка",
-                        "Нет реквизитов",
-                        "Некорректный реквизит",
-                        "Ошибка реквизита",
-                    ]
-                    else ""
-                )
+                if company_name and company_name not in [
+                    "Не найдено",
+                    "Ошибка",
+                    "Нет реквизитов",
+                    "Некорректный реквизит",
+                    "Ошибка реквизита",
+                ]:
+                    logger.info(f"⚠️ БАГ-8: API запрос контрагента (данные не были обогащены)")
+                    return company_name
             except Exception as e:
                 logger.warning(
                     f"Ошибка получения контрагента для счета {account_number}: {e}"

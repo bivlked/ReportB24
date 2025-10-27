@@ -34,6 +34,11 @@ class CacheEntry:
             self.last_accessed = self.created_at
 
 
+# 🔥 БАГ-7 FIX: Sentinel значение для обозначения "данные отсутствуют"
+# Используется для кэширования None (отсутствующих реквизитов, товаров и т.д.)
+CACHE_SENTINEL_NONE = {"__cache_sentinel__": "NONE", "__timestamp__": "sentinel"}
+
+
 class APIDataCache:
     """
     Система кэширования данных API для минимизации запросов к Bitrix24
@@ -295,6 +300,9 @@ class APIDataCache:
 
         Returns:
             Any: Кэшированные данные или None если нет в кэше
+        
+        Note:
+            🔥 БАГ-7 FIX: Преобразует sentinel обратно в None для прозрачности.
         """
         cache_key = self._generate_cache_key(method, params)
 
@@ -307,6 +315,11 @@ class APIDataCache:
                 entry.last_accessed = datetime.now()
                 self._hits += 1
 
+                # БАГ-7 FIX: Преобразуем sentinel обратно в None
+                if entry.data == CACHE_SENTINEL_NONE:
+                    logger.debug(f"Cache HIT (sentinel → None): {method} (ключ: {cache_key[:16]}...)")
+                    return None
+                
                 logger.debug(f"Cache HIT: {method} (ключ: {cache_key[:16]}...)")
                 return entry.data
 
@@ -323,10 +336,17 @@ class APIDataCache:
             method: Название метода API
             params: Параметры запроса
             data: Данные для кэширования
+        
+        Note:
+            🔥 БАГ-7 FIX: Теперь кэширует ОТСУТСТВУЮЩИЕ данные (None) используя sentinel.
+            Это КРИТИЧНО для предотвращения повторных API запросов к несуществующим ресурсам.
         """
+        # БАГ-7 FIX: Преобразуем None в sentinel для кэширования
         if data is None:
-            logger.warning(f"Попытка кэширования None для метода {method}")
-            return
+            data = CACHE_SENTINEL_NONE
+            logger.info(
+                f"✅ БАГ-7: Кэширование отсутствующих данных (sentinel) для {method}"
+            )
 
         cache_key = self._generate_cache_key(method, params)
 
@@ -334,7 +354,10 @@ class APIDataCache:
             entry = CacheEntry(data=data, created_at=datetime.now())
             self._general_cache[cache_key] = entry
 
-            logger.debug(f"Кэшированы данные для {method} (ключ: {cache_key[:16]}...)")
+            if data == CACHE_SENTINEL_NONE:
+                logger.debug(f"Кэширован sentinel для {method} (ключ: {cache_key[:16]}...)")
+            else:
+                logger.debug(f"Кэшированы данные для {method} (ключ: {cache_key[:16]}...)")
 
     def _generate_cache_key(self, method: str, params: Dict[str, Any]) -> str:
         """

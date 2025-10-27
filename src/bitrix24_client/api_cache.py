@@ -111,20 +111,23 @@ class APIDataCache:
         Args:
             invoice_id: ID счета
             products: Список товаров для кэширования
+        
+        Note:
+            🔥 БАГ-3 FIX: Теперь кэширует ПУСТЫЕ списки товаров.
+            Это КРИТИЧНО для предотвращения повторных API запросов для счетов без товаров.
         """
-        if not products:
-            logger.warning(
-                f"Попытка кэширования пустого списка товаров для счета {invoice_id}"
-            )
-            return
-
         cache_key = f"products_{invoice_id}"
 
         with self._lock:
             entry = CacheEntry(data=products, created_at=datetime.now())
             self._product_cache[cache_key] = entry
 
-            logger.debug(f"Кэшировано {len(products)} товаров для счета {invoice_id}")
+            if not products:
+                logger.info(
+                    f"✅ БАГ-3: Кэшировано 0 товаров для счета {invoice_id} (пустой список)"
+                )
+            else:
+                logger.debug(f"Кэшировано {len(products)} товаров для счета {invoice_id}")
 
     def get_company_cached(self, invoice_number: str) -> Optional[Tuple[str, str]]:
         """

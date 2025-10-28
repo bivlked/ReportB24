@@ -175,6 +175,7 @@ class TestBugA2Integration:
                 'opportunity': '100000',
                 'taxValue': '20000',
                 'begindate': '2024-06-15T00:00:00',
+                'UFCRM_SMART_INVOICE_1651168135187': '2024-06-20T00:00:00',  # БАГ-8 FIX: добавлена дата отгрузки
                 'closedate': '2024-06-20T00:00:00',
                 'stageId': 'DT31_20:WON'
             }
@@ -187,4 +188,4 @@ class TestBugA2Integration:
         # ИНН будет извлечен из ufCrmInn (fallback), контрагент из title
         assert result[0].inn == '3321035160'  # Из ufCrmInn fallback
         assert result[0].counterparty == 'ООО "Тест"'  # Из title
-        assert result[0].is_valid is True  # Данные валидны
+        assert result[0].is_valid is True  # Данные валидны (БАГ-8: нужны обе даты)

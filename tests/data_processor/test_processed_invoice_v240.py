@@ -250,6 +250,7 @@ class TestWorkflowIntegrationV240:
                 'opportunity': '50000',
                 'taxValue': '10000',
                 'begindate': '2024-06-15T00:00:00',
+                'UFCRM_SMART_INVOICE_1651168135187': '2024-06-20T00:00:00',  # БАГ-8 FIX
                 'closedate': '2024-06-20T00:00:00',
                 'stageId': 'DT31_20:WON'
             }
@@ -260,4 +261,4 @@ class TestWorkflowIntegrationV240:
         
         assert len(result) == 1
         assert isinstance(result[0], ProcessedInvoice)
-        assert result[0].is_valid is True
+        assert result[0].is_valid is True  # БАГ-8: требуются обе даты

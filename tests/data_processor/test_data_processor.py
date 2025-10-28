@@ -95,6 +95,7 @@ class TestDataProcessor:
                 'opportunity': '100000',
                 'taxValue': '20000',
                 'begindate': '2024-06-15T00:00:00',
+                'UFCRM_SMART_INVOICE_1651168135187': '2024-06-20T00:00:00',  # БАГ-8 FIX
                 'closedate': '2024-06-20T00:00:00',
                 'stageId': 'DT31_20:WON'
             },
@@ -105,6 +106,7 @@ class TestDataProcessor:
                 'opportunity': '200000',
                 'taxValue': '40000',
                 'begindate': '2024-06-16T00:00:00',
+                'UFCRM_SMART_INVOICE_1651168135187': '2024-06-21T00:00:00',  # БАГ-8 FIX
                 'closedate': '2024-06-21T00:00:00',
                 'stageId': 'DT31_20:WON'
             }
@@ -242,6 +244,7 @@ def test_data_processor_integration():
             'opportunity': '500000.00',
             'taxValue': '100000.00',
             'begindate': '2024-06-15T10:30:00',
+            'UFCRM_SMART_INVOICE_1651168135187': '2024-06-20T00:00:00',  # БАГ-8 FIX
             'closedate': '2024-06-20T00:00:00'
         },
         {
@@ -251,6 +254,7 @@ def test_data_processor_integration():
             'opportunity': '1200000',
             'taxValue': '0',
             'begindate': '2024-06-15T00:00:00',
+            'UFCRM_SMART_INVOICE_1651168135187': '2024-06-25T00:00:00',  # БАГ-8 FIX
             'closedate': '2024-06-25T00:00:00'
         }
     ]

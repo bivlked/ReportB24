@@ -11,6 +11,12 @@ import sys
 import time
 from pathlib import Path
 from datetime import datetime
+import io
+
+# Настройка UTF-8 кодировки для Windows консоли
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
 # Добавить корень проекта в PYTHONPATH для корректных импортов из scripts/
 project_root = Path(__file__).parent.parent

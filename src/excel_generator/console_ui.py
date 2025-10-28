@@ -253,11 +253,25 @@ class ConsoleUI:
     def print_completion_banner(output_path: str):
         """Печать баннера завершения."""
         print(f"\n{Colors.BRIGHT_GREEN}{Colors.BOLD}")
-        print("╔" + "═" * 58 + "╗")
-        print("║" + " " * 58 + "║")
-        print("║" + "  🎉 ОТЧЁТ УСПЕШНО СГЕНЕРИРОВАН!".center(58) + "║")
-        print("║" + " " * 58 + "║")
-        print("╚" + "═" * 58 + "╝")
+
+        box_width = 58
+        print("╔" + "═" * box_width + "╗")
+        print("║" + " " * box_width + "║")
+
+        # Текст с эмодзи: "  🎉 ОТЧЁТ УСПЕШНО СГЕНЕРИРОВАН!"
+        # ВАЖНО: 🎉 занимает 2 визуальных колонки, но len() считает как 1
+        message = "  🎉 ОТЧЁТ УСПЕШНО СГЕНЕРИРОВАН!"
+        emoji_extra_width = 1  # 🎉 занимает +1 визуальную колонку
+
+        # Вычисляем padding для центрирования с учетом визуальной ширины эмодзи
+        text_visual_width = len(message) + emoji_extra_width
+        total_padding = box_width - text_visual_width
+        left_padding = " " * (total_padding // 2)
+        right_padding = " " * (total_padding - total_padding // 2)
+
+        print("║" + left_padding + message + right_padding + "║")
+        print("║" + " " * box_width + "║")
+        print("╚" + "═" * box_width + "╝")
         print(Colors.RESET)
         print(
             f"{Colors.CYAN}📄 Файл сохранён: {Colors.WHITE}{output_path}{Colors.RESET}\n"

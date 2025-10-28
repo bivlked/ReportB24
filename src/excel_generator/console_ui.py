@@ -222,13 +222,21 @@ class ConsoleUI:
             else:
                 value_str = str(value)
 
-            # Рассчитываем отступы для выравнивания
-            key_width = 38
-            value_width = 15
-            line_content = f" {icon} {key:<{key_width}} {color}{value_str:>{value_width}}{Colors.RESET} "
+            # Создаем строку БЕЗ цветов нужной длины (ровно box_width символов)
+            # Формат: " ✅ Текст...                           Значение "
+            icon_part = f" {icon} "  # 3 символа (пробел + иконка + пробел)
+            key_part = f"{key}"  # Переменная длина
+            value_part = f"{value_str}"  # Переменная длина
 
+            # Вычисляем сколько нужно пробелов между текстом и значением
+            # Всего должно быть ровно box_width (60) символов
+            used_space = len(icon_part) + len(key_part) + len(value_part)
+            padding = " " * max(1, box_width - used_space)  # Минимум 1 пробел
+
+            # Собираем строку: иконка + текст + padding + цветное_значение
+            # Цветные коды НЕ считаются в длину, поэтому выравнивание будет правильным
             print(
-                f"{Colors.BRIGHT_CYAN}║{Colors.RESET}{line_content}{Colors.BRIGHT_CYAN}║{Colors.RESET}"
+                f"{Colors.BRIGHT_CYAN}║{Colors.RESET}{icon_part}{key_part}{padding}{color}{value_part}{Colors.RESET}{Colors.BRIGHT_CYAN}║{Colors.RESET}"
             )
 
         print(f"{Colors.BRIGHT_CYAN}╚{'═' * box_width}╝{Colors.RESET}\n")

@@ -689,7 +689,7 @@ class Bitrix24Client:
                 result = self.get_products_by_invoice(invoice_id)
                 products = result.get("products", [])
                 all_products[invoice_id] = products
-                
+
                 # БАГ-9 FIX: Логируем если была ошибка
                 if result.get("has_error"):
                     logger.warning(
@@ -699,7 +699,9 @@ class Bitrix24Client:
                     logger.debug(f"Invoice {invoice_id}: {len(products)} products")
             except Exception as e:
                 # Не должно происходить, т.к. get_products_by_invoice перехватывает все
-                logger.error(f"Unexpected error getting products for invoice {invoice_id}: {e}")
+                logger.error(
+                    f"Unexpected error getting products for invoice {invoice_id}: {e}"
+                )
                 all_products[invoice_id] = []
 
         total_products = sum(len(products) for products in all_products.values())

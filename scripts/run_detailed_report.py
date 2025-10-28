@@ -184,34 +184,35 @@ def main():
 
                 # Итоговая сводка
                 ConsoleUI.print_section_separator()
-                print(f"\n{Colors.BRIGHT_CYAN}{Colors.BOLD}{'═' * 70}")
-                print(f"  ИТОГИ ГЕНЕРАЦИИ")
-                print(f"{'═' * 70}{Colors.RESET}\n")
-                print(
-                    f"  {Colors.CYAN}Период:{Colors.RESET}          {report_period_config.start_date} - {report_period_config.end_date}"
-                )
-                print(
-                    f"  {Colors.CYAN}Счетов:{Colors.RESET}          {len(brief_data)} (валидных: {Colors.BRIGHT_GREEN}{result.quality_metrics.brief_valid}{Colors.RESET})"
-                )
-                print(
-                    f"  {Colors.CYAN}Товаров:{Colors.RESET}         {len(detailed_data)} (валидных: {Colors.BRIGHT_GREEN}{result.quality_metrics.detailed_valid}{Colors.RESET})"
-                )
+                box_width = 60
+                print(f"\n{Colors.BRIGHT_CYAN}{Colors.BOLD}╔{'═' * box_width}╗")
+                print(f"║ {'ИТОГИ ГЕНЕРАЦИИ':^{box_width-2}} ║")
+                print(f"╠{'═' * box_width}╣{Colors.RESET}")
 
-                problems_color = (
-                    Colors.BRIGHT_RED
-                    if result.quality_metrics.total_issues > 0
-                    else Colors.BRIGHT_GREEN
+                # Функция для безопасного вывода строки с рамкой
+                def print_box_line(text: str):
+                    # Обрезаем если слишком длинный
+                    if len(text) > box_width:
+                        text = text[: box_width - 3] + "..."
+                    print(
+                        f"{Colors.BRIGHT_CYAN}║{Colors.RESET}{text:<{box_width}}{Colors.BRIGHT_CYAN}║{Colors.RESET}"
+                    )
+
+                # Выводим строки
+                print_box_line(
+                    f" Период: {report_period_config.start_date} - {report_period_config.end_date}"
                 )
-                print(
-                    f"  {Colors.CYAN}Проблем:{Colors.RESET}         {problems_color}{result.quality_metrics.total_issues}{Colors.RESET}"
+                print_box_line(
+                    f" Счетов: {len(brief_data)} (валидных: {result.quality_metrics.brief_valid})"
                 )
-                print(
-                    f"  {Colors.CYAN}Время:{Colors.RESET}           {execution_time:.1f} сек"
+                print_box_line(
+                    f" Товаров: {len(detailed_data)} (валидных: {result.quality_metrics.detailed_valid})"
                 )
-                print(
-                    f"  {Colors.CYAN}Файл:{Colors.RESET}            {Colors.WHITE}{result.output_path}{Colors.RESET}"
-                )
-                print(f"\n{Colors.BRIGHT_CYAN}{'═' * 70}{Colors.RESET}\n")
+                print_box_line(f" Проблем: {result.quality_metrics.total_issues}")
+                print_box_line(f" Время: {execution_time:.1f} сек")
+                print_box_line(f" Файл: {result.output_path}")
+
+                print(f"{Colors.BRIGHT_CYAN}╚{'═' * box_width}╝{Colors.RESET}\n")
 
                 return True
 

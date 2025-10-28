@@ -561,7 +561,7 @@ class Bitrix24Client:
 
         return response.data
 
-    def get_products_by_invoice(self, invoice_id: int) -> List[Dict[str, Any]]:
+    def get_products_by_invoice(self, invoice_id: int) -> Dict[str, Any]:
         """
         Получение товаров по ID счета через crm.item.productrow.list с кэшированием
 
@@ -571,11 +571,16 @@ class Bitrix24Client:
 
         Использует APIDataCache для минимизации дублирующихся запросов.
 
+        🔥 БАГ-9 FIX: Теперь различает ожидаемые пустые результаты и реальные ошибки.
+
         Args:
             invoice_id: ID Smart Invoice счета
 
         Returns:
-            List[Dict]: Список товаров счета
+            Dict[str, Any]: Словарь с полями:
+                - products: List[Dict] - список товаров
+                - has_error: bool - флаг наличия ошибки
+                - error_message: str (optional) - описание ошибки
         """
         try:
             method = "crm.item.productrow.list"
@@ -591,6 +596,10 @@ class Bitrix24Client:
             cached_result = cache.get(method, params)
             if cached_result is not None:
                 logger.debug(f"Cache hit for products of invoice {invoice_id}")
+                # БАГ-9 FIX: кэш хранит List, оборачиваем в Dict
+                if isinstance(cached_result, list):
+                    return {"products": cached_result, "has_error": False}
+                # Если в кэше уже Dict (после обновления), возвращаем как есть
                 return cached_result
 
             logger.debug(f"Getting products for invoice {invoice_id} (cache miss)")
@@ -604,22 +613,43 @@ class Bitrix24Client:
                     else []
                 )
 
-                # Сохраняем в кэш
+                # БАГ-9 FIX: Сохраняем список (для обратной совместимости кэша)
                 cache.put(method, params, products)
 
                 logger.info(
                     f"Retrieved {len(products)} products for invoice {invoice_id}"
                 )
-                return products
+                return {"products": products, "has_error": False}
             else:
-                logger.warning(
-                    f"No products found for invoice {invoice_id}: {response.error if response else 'Unknown error'}"
+                # Ожидаемый случай: счёт не имеет товаров
+                logger.debug(
+                    f"No products found for invoice {invoice_id}: {response.error if response else 'Empty response'}"
                 )
-                return []
+                # БАГ-9 FIX: Кэшируем пустой результат (уже работает через БАГ-7)
+                cache.put(method, params, [])
+                return {"products": [], "has_error": False}
+
+        except (AuthenticationError, ServerError, NetworkError, APITimeoutError) as e:
+            # БАГ-9 FIX: Реальная ошибка - НЕ скрываем!
+            logger.error(
+                f"Critical error getting products for invoice {invoice_id}: {e.__class__.__name__} - {e}"
+            )
+            return {
+                "products": [],
+                "has_error": True,
+                "error_message": f"{e.__class__.__name__}: {str(e)}",
+            }
 
         except Exception as e:
-            logger.error(f"Error getting products for invoice {invoice_id}: {e}")
-            return []
+            # БАГ-9 FIX: Неожиданная ошибка - логируем и помечаем как ошибку
+            logger.exception(
+                f"Unexpected error getting products for invoice {invoice_id}: {e}"
+            )
+            return {
+                "products": [],
+                "has_error": True,
+                "error_message": f"Unexpected error: {str(e)}",
+            }
 
     def get_products_by_invoices_batch(
         self, invoice_ids: List[int], chunk_size: int = 50
@@ -655,12 +685,21 @@ class Bitrix24Client:
         # Обрабатываем каждый счет индивидуально
         for invoice_id in invoice_ids:
             try:
-                products = self.get_products_by_invoice(invoice_id)
+                # БАГ-9 FIX: get_products_by_invoice теперь возвращает Dict
+                result = self.get_products_by_invoice(invoice_id)
+                products = result.get("products", [])
                 all_products[invoice_id] = products
-                if products:
+                
+                # БАГ-9 FIX: Логируем если была ошибка
+                if result.get("has_error"):
+                    logger.warning(
+                        f"Invoice {invoice_id}: error getting products - {result.get('error_message', 'Unknown')}"
+                    )
+                elif products:
                     logger.debug(f"Invoice {invoice_id}: {len(products)} products")
             except Exception as e:
-                logger.error(f"Error getting products for invoice {invoice_id}: {e}")
+                # Не должно происходить, т.к. get_products_by_invoice перехватывает все
+                logger.error(f"Unexpected error getting products for invoice {invoice_id}: {e}")
                 all_products[invoice_id] = []
 
         total_products = sum(len(products) for products in all_products.values())

@@ -6,7 +6,66 @@
 """
 
 import sys
+import time
+import threading
 from typing import Optional
+
+
+class Spinner:
+    """Простой спиннер для индикации прогресса."""
+
+    def __init__(self, message: str = "Загрузка", color: str = None):
+        """
+        Инициализация спиннера.
+
+        Args:
+            message: Сообщение для отображения
+            color: Цвет спиннера (необязательно)
+        """
+        self.message = message
+        self.color = color or Colors.CYAN
+        self.spinning = False
+        self.thread = None
+        self.frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        self.current_frame = 0
+
+    def _spin(self):
+        """Внутренний метод для вращения спиннера."""
+        while self.spinning:
+            frame = self.frames[self.current_frame % len(self.frames)]
+            sys.stdout.write(f"\r{self.color}{frame}{Colors.RESET} {self.message}...")
+            sys.stdout.flush()
+            self.current_frame += 1
+            time.sleep(0.1)
+
+    def start(self):
+        """Запустить спиннер."""
+        self.spinning = True
+        self.thread = threading.Thread(target=self._spin, daemon=True)
+        self.thread.start()
+
+    def stop(self, final_message: str = None, success: bool = True):
+        """
+        Остановить спиннер.
+
+        Args:
+            final_message: Финальное сообщение (необязательно)
+            success: Успешное ли завершение
+        """
+        self.spinning = False
+        if self.thread:
+            self.thread.join()
+
+        # Очищаем строку
+        sys.stdout.write("\r" + " " * (len(self.message) + 20) + "\r")
+        sys.stdout.flush()
+
+        # Выводим финальное сообщение если задано
+        if final_message:
+            if success:
+                print(f"{Colors.BRIGHT_GREEN}✅{Colors.RESET} {final_message}")
+            else:
+                print(f"{Colors.BRIGHT_RED}❌{Colors.RESET} {final_message}")
 
 
 class Colors:
@@ -136,9 +195,10 @@ class ConsoleUI:
             success_threshold: Порог успеха (%)
             warning_threshold: Порог предупреждения (%)
         """
-        print(f"\n{Colors.BRIGHT_CYAN}{Colors.BOLD}╔{'═' * 58}╗")
-        print(f"║  {title:54}  ║")
-        print(f"╠{'═' * 58}╣{Colors.RESET}")
+        box_width = 60
+        print(f"\n{Colors.BRIGHT_CYAN}{Colors.BOLD}╔{'═' * box_width}╗")
+        print(f"║ {title:^{box_width-2}} ║")
+        print(f"╠{'═' * box_width}╣{Colors.RESET}")
 
         for key, value in stats.items():
             # Определяем цвет на основе значения
@@ -162,11 +222,16 @@ class ConsoleUI:
             else:
                 value_str = str(value)
 
+            # Рассчитываем отступы для выравнивания
+            key_width = 38
+            value_width = 15
+            line_content = f" {icon} {key:<{key_width}} {color}{value_str:>{value_width}}{Colors.RESET} "
+
             print(
-                f"{Colors.CYAN}║{Colors.RESET}  {icon} {key:35} {color}{value_str:>15}{Colors.RESET} {Colors.CYAN}║{Colors.RESET}"
+                f"{Colors.BRIGHT_CYAN}║{Colors.RESET}{line_content}{Colors.BRIGHT_CYAN}║{Colors.RESET}"
             )
 
-        print(f"{Colors.BRIGHT_CYAN}╚{'═' * 58}╝{Colors.RESET}\n")
+        print(f"{Colors.BRIGHT_CYAN}╚{'═' * box_width}╝{Colors.RESET}\n")
 
     @staticmethod
     def print_section_separator():

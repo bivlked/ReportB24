@@ -34,7 +34,7 @@ from .validation import (
 )
 
 # Console UI components (v2.5.0)
-from .console_ui import ConsoleUI, Colors, format_number, format_duration
+from .console_ui import ConsoleUI, Colors, Spinner, format_number, format_duration
 
 # Export all public classes
 __all__ = [
@@ -64,6 +64,7 @@ __all__ = [
     # Console UI (v2.5.0)
     "ConsoleUI",
     "Colors",
+    "Spinner",
     "format_number",
     "format_duration",
 ]

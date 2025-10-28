@@ -24,31 +24,53 @@ from .layout import ReportLayout, SummaryLayout, WorksheetBuilder, ColumnDefinit
 # Formatting components
 from .formatter import ExcelDataFormatter, ExcelSummaryFormatter, DataValidator
 
+# Validation components (v2.5.0)
+from .validation import (
+    DataQualityValidator,
+    ValidationIssue,
+    ValidationResult,
+    QualityMetrics,
+    ComprehensiveReportResult,
+)
+
+# Console UI components (v2.5.0)
+from .console_ui import ConsoleUI, Colors, format_number, format_duration
+
 # Export all public classes
 __all__ = [
     # Main generator classes
-    'ExcelReportGenerator',
-    'ExcelReportBuilder', 
-    'ReportGenerationError',
-    
+    "ExcelReportGenerator",
+    "ExcelReportBuilder",
+    "ReportGenerationError",
     # Styling classes
-    'ExcelStyles',
-    'ColorScheme',
-    'ColumnStyleConfig',
-    
+    "ExcelStyles",
+    "ColorScheme",
+    "ColumnStyleConfig",
     # Layout classes
-    'ReportLayout',
-    'SummaryLayout',
-    'WorksheetBuilder',
-    'ColumnDefinition',
-    
+    "ReportLayout",
+    "SummaryLayout",
+    "WorksheetBuilder",
+    "ColumnDefinition",
     # Formatting classes
-    'ExcelDataFormatter',
-    'ExcelSummaryFormatter',
-    'DataValidator'
+    "ExcelDataFormatter",
+    "ExcelSummaryFormatter",
+    "DataValidator",
+    # Validation classes (v2.5.0)
+    "DataQualityValidator",
+    "ValidationIssue",
+    "ValidationResult",
+    "QualityMetrics",
+    "ComprehensiveReportResult",
+    # Console UI (v2.5.0)
+    "ConsoleUI",
+    "Colors",
+    "format_number",
+    "format_duration",
 ]
 
 # Version information
-__version__ = '1.0.0'
-__author__ = 'Bitrix24 Report Generator'
-__description__ = 'Excel report generator with visual formatting for Bitrix24 data' 
+__version__ = (
+    "2.5.0"  # 🆕 Added validation, quality metrics, and colored console output
+)
+__author__ = "Bitrix24 Report Generator"
+__description__ = "Excel report generator with visual formatting for Bitrix24 data"

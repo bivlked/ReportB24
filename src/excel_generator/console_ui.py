@@ -229,8 +229,11 @@ class ConsoleUI:
             value_part = f"{value_str}"  # Переменная длина
 
             # Вычисляем сколько нужно пробелов между текстом и значением
-            # Всего должно быть ровно box_width (60) символов
-            used_space = len(icon_part) + len(key_part) + len(value_part)
+            # ВАЖНО: Эмодзи (✅, ❌, ⚠️) занимают 2 визуальных колонки, но len() считает их как 1!
+            emoji_extra_width = 1 if icon in ["✅", "❌", "⚠️"] else 0
+            used_space = (
+                len(icon_part) + len(key_part) + len(value_part) + emoji_extra_width
+            )
             padding = " " * max(1, box_width - used_space)  # Минимум 1 пробел
 
             # Собираем строку: иконка + текст + padding + цветное_значение

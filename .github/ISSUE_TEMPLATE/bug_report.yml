@@ -1,0 +1,101 @@
+name: 🐛 Bug Report
+description: Сообщить об ошибке или проблеме
+title: "[BUG]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за сообщение об ошибке! Пожалуйста, заполните форму ниже.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Описание проблемы
+      description: Четкое и краткое описание ошибки
+      placeholder: Опишите, что произошло не так
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги для воспроизведения
+      description: Как воспроизвести ошибку
+      placeholder: |
+        1. Перейти к '...'
+        2. Выполнить команду '...'
+        3. Увидеть ошибку
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение
+      description: Что должно было произойти
+      placeholder: Опишите ожидаемый результат
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Фактическое поведение
+      description: Что произошло на самом деле
+      placeholder: Опишите фактический результат
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи и сообщения об ошибках
+      description: Скопируйте и вставьте соответствующие логи
+      render: shell
+      placeholder: |
+        Traceback или логи ошибки
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия
+      description: Какая версия ReportB24?
+      placeholder: "v2.5.0"
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Версия Python
+      description: Какая версия Python?
+      placeholder: "Python 3.8.10"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Операционная система
+      description: Какая ОС?
+      placeholder: "Windows 10, Ubuntu 20.04, macOS 11.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Дополнительный контекст
+      description: Любая другая информация об ошибке
+      placeholder: Скриншоты, конфигурация, и т.д.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Подтверждение
+      options:
+        - label: Я проверил существующие issues и не нашел дубликатов
+          required: true
+        - label: Я прочитал документацию и troubleshooting guide
+          required: true

@@ -1,0 +1,84 @@
+name: ✨ Feature Request
+description: Предложить новую функцию или улучшение
+title: "[FEATURE]: "
+labels: ["enhancement", "needs-discussion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за предложение! Пожалуйста, заполните форму ниже.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Проблема, которую решает функция
+      description: Четкое описание проблемы
+      placeholder: Я часто сталкиваюсь с проблемой, когда...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Предлагаемое решение
+      description: Как вы видите решение этой проблемы
+      placeholder: Я предлагаю добавить...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Альтернативные решения
+      description: Какие альтернативы вы рассматривали?
+      placeholder: Я также думал о...
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Опишите конкретный сценарий использования
+      placeholder: Когда пользователь делает X, система должна...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Приоритет
+      description: Насколько важна эта функция для вас?
+      options:
+        - "Низкий (nice to have)"
+        - "Средний (улучшит работу)"
+        - "Высокий (критично для работы)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: mockup
+    attributes:
+      label: Mockups / Примеры
+      description: Если применимо, добавьте скриншоты или mockups
+      placeholder: Перетащите изображения сюда
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Готовность помочь
+      options:
+        - label: Я готов помочь с реализацией этой функции
+          required: false
+        - label: Я готов написать тесты для этой функции
+          required: false
+        - label: Я готов написать документацию для этой функции
+          required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Подтверждение
+      options:
+        - label: Я проверил существующие issues и не нашел похожих предложений
+          required: true
+        - label: Я прочитал roadmap проекта
+          required: true

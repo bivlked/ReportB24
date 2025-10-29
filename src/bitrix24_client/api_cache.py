@@ -34,6 +34,11 @@ class CacheEntry:
             self.last_accessed = self.created_at
 
 
+# 🔥 БАГ-7 FIX: Sentinel значение для обозначения "данные отсутствуют"
+# Используется для кэширования None (отсутствующих реквизитов, товаров и т.д.)
+CACHE_SENTINEL_NONE = {"__cache_sentinel__": "NONE", "__timestamp__": "sentinel"}
+
+
 class APIDataCache:
     """
     Система кэширования данных API для минимизации запросов к Bitrix24
@@ -111,7 +116,7 @@ class APIDataCache:
         Args:
             invoice_id: ID счета
             products: Список товаров для кэширования
-        
+
         Note:
             🔥 БАГ-3 FIX: Теперь кэширует ПУСТЫЕ списки товаров.
             Это КРИТИЧНО для предотвращения повторных API запросов для счетов без товаров.
@@ -127,7 +132,9 @@ class APIDataCache:
                     f"✅ БАГ-3: Кэшировано 0 товаров для счета {invoice_id} (пустой список)"
                 )
             else:
-                logger.debug(f"Кэшировано {len(products)} товаров для счета {invoice_id}")
+                logger.debug(
+                    f"Кэшировано {len(products)} товаров для счета {invoice_id}"
+                )
 
     def get_company_cached(self, invoice_number: str) -> Optional[Tuple[str, str]]:
         """
@@ -295,6 +302,9 @@ class APIDataCache:
 
         Returns:
             Any: Кэшированные данные или None если нет в кэше
+
+        Note:
+            🔥 БАГ-7 FIX: Преобразует sentinel обратно в None для прозрачности.
         """
         cache_key = self._generate_cache_key(method, params)
 
@@ -306,6 +316,13 @@ class APIDataCache:
                 entry.access_count += 1
                 entry.last_accessed = datetime.now()
                 self._hits += 1
+
+                # БАГ-7 FIX: Преобразуем sentinel обратно в None
+                if entry.data == CACHE_SENTINEL_NONE:
+                    logger.debug(
+                        f"Cache HIT (sentinel → None): {method} (ключ: {cache_key[:16]}...)"
+                    )
+                    return None
 
                 logger.debug(f"Cache HIT: {method} (ключ: {cache_key[:16]}...)")
                 return entry.data
@@ -323,10 +340,17 @@ class APIDataCache:
             method: Название метода API
             params: Параметры запроса
             data: Данные для кэширования
+
+        Note:
+            🔥 БАГ-7 FIX: Теперь кэширует ОТСУТСТВУЮЩИЕ данные (None) используя sentinel.
+            Это КРИТИЧНО для предотвращения повторных API запросов к несуществующим ресурсам.
         """
+        # БАГ-7 FIX: Преобразуем None в sentinel для кэширования
         if data is None:
-            logger.warning(f"Попытка кэширования None для метода {method}")
-            return
+            data = CACHE_SENTINEL_NONE
+            logger.info(
+                f"✅ БАГ-7: Кэширование отсутствующих данных (sentinel) для {method}"
+            )
 
         cache_key = self._generate_cache_key(method, params)
 
@@ -334,7 +358,14 @@ class APIDataCache:
             entry = CacheEntry(data=data, created_at=datetime.now())
             self._general_cache[cache_key] = entry
 
-            logger.debug(f"Кэшированы данные для {method} (ключ: {cache_key[:16]}...)")
+            if data == CACHE_SENTINEL_NONE:
+                logger.debug(
+                    f"Кэширован sentinel для {method} (ключ: {cache_key[:16]}...)"
+                )
+            else:
+                logger.debug(
+                    f"Кэшированы данные для {method} (ключ: {cache_key[:16]}...)"
+                )
 
     def _generate_cache_key(self, method: str, params: Dict[str, Any]) -> str:
         """
@@ -501,26 +532,6 @@ class APIDataCache:
             return "Удовлетворительная"
         else:
             return "Требует оптимизации"
-
-    def print_cache_report(self) -> None:
-        """Вывод детального отчета о состоянии кэша"""
-        stats = self.get_cache_stats()
-
-        print("\n" + "=" * 50)
-        print("📊 ОТЧЕТ О СОСТОЯНИИ API CACHE")
-        print("=" * 50)
-        print(f"🎯 Hit Rate: {stats['hit_rate_percent']}%")
-        print(f"✅ Попаданий: {stats['total_hits']}")
-        print(f"❌ Промахов: {stats['total_misses']}")
-        print(f"📈 Всего запросов: {stats['total_requests']}")
-        print(f"⏱️ Время работы: {stats['uptime_minutes']} мин")
-        print(f"🧠 Эффективность: {stats['memory_efficiency']}")
-
-        print("\n📦 РАЗМЕРЫ КЭШЕЙ:")
-        for cache_type, size in stats["cache_sizes"].items():
-            print(f"  • {cache_type}: {size} записей")
-
-        print("=" * 50)
 
 
 # Глобальный экземпляр кэша для использования в приложении

@@ -24,6 +24,16 @@ from .layout import (
 )
 from .formatter import ExcelDataFormatter, ExcelSummaryFormatter, DataValidator
 
+# v2.5.0: Validation and Quality Metrics
+from .validation import (
+    DataQualityValidator,
+    QualityMetrics,
+    ComprehensiveReportResult,
+)
+
+# v2.5.0: Console UI для цветного вывода
+from .console_ui import ConsoleUI, Colors, format_number, format_duration
+
 
 class ExcelReportGenerator:
     """
@@ -58,30 +68,30 @@ class ExcelReportGenerator:
     def _safe_sum_numeric(self, values, key=None):
         """
         Безопасное суммирование значений, игнорируя нечисловые.
-        
-        🔧 ИСПРАВЛЕНИЕ БАГ-4: Решает проблему суммирования когда vat_amount 
+
+        🔧 ИСПРАВЛЕНИЕ БАГ-4: Решает проблему суммирования когда vat_amount
         может быть строкой "нет" вместо числа.
-        
+
         Args:
             values: Список значений или записей
             key: Функция для извлечения значения (если values - записи)
-        
+
         Returns:
             Decimal: Сумма числовых значений
-        
+
         Examples:
             >>> _safe_sum_numeric([1, 2, "нет", 3])  # 6
             >>> _safe_sum_numeric(records, key=lambda r: r['vat_amount'])
         """
-        total = Decimal('0')
+        total = Decimal("0")
         for item in values:
             value = key(item) if key else item
-            
+
             # Проверяем что значение числовое
             if isinstance(value, (int, float, Decimal)):
                 total += Decimal(str(value))
             # Иначе (строка, None и т.д.) - пропускаем
-        
+
         return float(total)  # Возвращаем float для совместимости
 
     def create_report(self, data: List[Dict[str, Any]], output_path: str) -> str:
@@ -181,13 +191,13 @@ class ExcelReportGenerator:
             # Получаем данные строки в правильном порядке
             amount_value = record.get("amount", 0)
             vat_value = record.get("vat_amount", "")
-            
+
             # Конвертируем Decimal в float для Excel
             if isinstance(amount_value, Decimal):
                 amount_value = float(amount_value)
             if isinstance(vat_value, Decimal):
                 vat_value = float(vat_value)
-            
+
             row_data = [
                 record.get("account_number", ""),
                 record.get("inn", ""),
@@ -647,34 +657,159 @@ class ExcelReportGenerator:
             "total_amount": total_amount,
         }
 
+    def _create_metadata_sheet(self, wb: Workbook, metrics: QualityMetrics) -> None:
+        """
+        Создаёт скрытый лист метаданных с информацией о качестве отчёта.
+
+        🆕 v2.5.0: Добавлен для трассируемости и качества данных
+
+        Args:
+            wb: Рабочая книга Excel
+            metrics: Метрики качества отчёта
+        """
+        ws = wb.create_sheet("Метаданные")
+        ws.sheet_state = "hidden"  # Скрываем лист
+
+        # Заголовок
+        ws["A1"] = "📊 МЕТАДАННЫЕ ОТЧЁТА"
+        ws["A1"].font = Font(bold=True, size=14, color="1F4E78")
+
+        # Общая информация
+        ws["A3"] = "Дата генерации:"
+        ws["B3"] = metrics.generation_time
+        ws["B3"].font = Font(bold=True)
+
+        ws["A4"] = "Версия генератора:"
+        ws["B4"] = metrics.generator_version
+        ws["B4"].font = Font(bold=True)
+
+        # Статистика качества
+        ws["A6"] = "СТАТИСТИКА КАЧЕСТВА"
+        ws["A6"].font = Font(bold=True, size=12, color="1F4E78")
+
+        ws["A8"] = "Лист 'Краткий':"
+        ws["B8"] = (
+            f"{metrics.brief_valid}/{metrics.brief_total} валидных ({metrics.brief_success_rate:.1f}%)"
+        )
+
+        # Цвет в зависимости от процента
+        if metrics.brief_success_rate >= 90:
+            ws["B8"].font = Font(color="00B050")  # Зелёный
+        elif metrics.brief_success_rate >= 70:
+            ws["B8"].font = Font(color="FFC000")  # Жёлтый
+        else:
+            ws["B8"].font = Font(color="FF0000")  # Красный
+
+        ws["A9"] = "Лист 'Полный':"
+        ws["B9"] = (
+            f"{metrics.detailed_valid}/{metrics.detailed_total} валидных ({metrics.detailed_success_rate:.1f}%)"
+        )
+
+        if metrics.detailed_success_rate >= 90:
+            ws["B9"].font = Font(color="00B050")
+        elif metrics.detailed_success_rate >= 70:
+            ws["B9"].font = Font(color="FFC000")
+        else:
+            ws["B9"].font = Font(color="FF0000")
+
+        ws["A11"] = "Проблем обнаружено:"
+        ws["B11"] = metrics.total_issues
+
+        if metrics.total_issues > 0:
+            ws["B11"].font = Font(bold=True, color="FF0000")
+        else:
+            ws["B11"].font = Font(bold=True, color="00B050")
+
+        # Проблемные записи
+        if metrics.brief_issues or metrics.detailed_issues:
+            ws["A13"] = "ПРОБЛЕМНЫЕ ЗАПИСИ"
+            ws["A13"].font = Font(bold=True, size=11, color="C00000")
+
+            ws["A14"] = "ID Записи"
+            ws["B14"] = "Поле"
+            ws["C14"] = "Тип"
+            ws["D14"] = "Описание"
+
+            # Форматирование заголовков
+            for col in ["A14", "B14", "C14", "D14"]:
+                ws[col].font = Font(bold=True)
+                ws[col].fill = PatternFill(
+                    start_color="D9E1F2", end_color="D9E1F2", fill_type="solid"
+                )
+
+            row = 15
+            all_issues = metrics.brief_issues + metrics.detailed_issues
+
+            # Ограничим количество записей до 100 для размера файла
+            for issue in all_issues[:100]:
+                ws[f"A{row}"] = issue.record_id
+                ws[f"B{row}"] = issue.field
+                ws[f"C{row}"] = issue.issue_type
+                ws[f"D{row}"] = issue.message
+                row += 1
+
+            if len(all_issues) > 100:
+                ws[f"A{row}"] = "..."
+                ws[f"D{row}"] = f"И ещё {len(all_issues) - 100} проблем(а)"
+                ws[f"D{row}"].font = Font(italic=True, color="808080")
+
+        # Настройка ширины колонок
+        ws.column_dimensions["A"].width = 20
+        ws.column_dimensions["B"].width = 20
+        ws.column_dimensions["C"].width = 15
+        ws.column_dimensions["D"].width = 50
+
+        self.logger.debug("✅ Скрытый лист метаданных создан")
+
     def generate_comprehensive_report(
         self,
         brief_data: List[Dict[str, Any]],
         product_data: Any,  # DetailedInvoiceData или processed data из DataProcessor
         output_path: str,
-    ) -> str:
+        return_metrics: bool = False,  # 🆕 v2.5.0: opt-in для метрик
+        verbose: bool = True,  # 🆕 v2.5.0: цветной вывод
+    ) -> str | ComprehensiveReportResult:
         """
-        Генерирует комплексный отчет с интеграцией всех фаз проекта.
+        Генерирует комплексный отчет с валидацией и метриками качества.
+
+        🆕 v2.5.0: Добавлена валидация данных, метрики качества и цветной вывод
 
         Объединяет:
         - API данные из Фазы 2 (Bitrix24Client)
         - Обработанные данные из Фазы 3 (DataProcessor)
         - Excel генерацию из Фазы 4 (ExcelReportGenerator)
+        - Валидацию и метрики качества (v2.5.0)
 
         Args:
             brief_data: Краткие данные счетов
             product_data: Детальные данные товаров (из DataProcessor)
             output_path: Путь для сохранения
+            return_metrics: Возвращать метрики качества (opt-in для обратной совместимости)
+            verbose: Выводить цветную информацию в консоль
 
         Returns:
-            Путь к созданному комплексному отчету
+            str | ComprehensiveReportResult: Путь к файлу или результат с метриками
         """
+        import time
+
+        start_time = time.time()
+
         try:
-            self.logger.info("🎯 Генерация комплексного отчета с интеграцией всех фаз")
+            if verbose:
+                ConsoleUI.print_header(
+                    "🚀 ГЕНЕРАЦИЯ ОТЧЁТА BITRIX24", Colors.BRIGHT_CYAN
+                )
+
+            self.logger.info("🎯 Генерация комплексного отчета с валидацией качества")
+
+            # ========================================
+            # ШАГ 1: Подготовка данных
+            # ========================================
+            if verbose:
+                ConsoleUI.print_step(1, "Подготовка данных...", "📦")
 
             # Если product_data это результат из DataProcessor
             if hasattr(product_data, "format_products_for_excel"):
-                # Получаем данные в формате для Excel
                 detailed_data = product_data.format_products_for_excel()
             elif isinstance(product_data, dict) and "products" in product_data:
                 # Если это grouped_data из group_products_by_invoice
@@ -700,12 +835,147 @@ class ExcelReportGenerator:
                 # Если это уже готовые данные для Excel
                 detailed_data = product_data
 
-            # Создаем двухлистовой отчет
-            return self.create_multi_sheet_report(
-                brief_data, detailed_data, output_path
+            if verbose:
+                ConsoleUI.print_success(
+                    f"Загружено: {len(brief_data)} счетов, {len(detailed_data)} товаров"
+                )
+
+            # ========================================
+            # ШАГ 2: Валидация данных
+            # ========================================
+            if verbose:
+                ConsoleUI.print_step(2, "Валидация качества данных...", "🔍")
+
+            validator = DataQualityValidator()
+
+            # Валидация краткого отчета
+            brief_validation = validator.validate_brief_data(brief_data)
+            if verbose:
+                ConsoleUI.print_info(
+                    f"Краткий отчёт: {brief_validation.valid_records}/{brief_validation.total_records} валидных ({brief_validation.success_rate:.1f}%)",
+                    indent=1,
+                )
+
+            # Валидация детального отчета
+            detailed_validation = validator.validate_detailed_data(detailed_data)
+            if verbose:
+                ConsoleUI.print_info(
+                    f"Полный отчёт: {detailed_validation.valid_records}/{detailed_validation.total_records} валидных ({detailed_validation.success_rate:.1f}%)",
+                    indent=1,
+                )
+
+            # Создание метрик
+            metrics = QualityMetrics(
+                brief_total=len(brief_data),
+                brief_valid=brief_validation.valid_records,
+                brief_issues=brief_validation.issues,
+                detailed_total=len(detailed_data),
+                detailed_valid=detailed_validation.valid_records,
+                detailed_issues=detailed_validation.issues,
             )
 
+            # Предупреждения о проблемах
+            if metrics.has_critical_issues():
+                if verbose:
+                    ConsoleUI.print_warning(
+                        f"Обнаружено критических проблем: {metrics.total_issues}"
+                    )
+                self.logger.warning("⚠️ ОБНАРУЖЕНЫ КРИТИЧЕСКИЕ ПРОБЛЕМЫ В ДАННЫХ!")
+            elif metrics.total_issues > 0:
+                if verbose:
+                    ConsoleUI.print_warning(
+                        f"Обнаружено проблем: {metrics.total_issues}"
+                    )
+            else:
+                if verbose:
+                    ConsoleUI.print_success("Все данные валидны ✨")
+
+            # ========================================
+            # ШАГ 3: Генерация Excel
+            # ========================================
+            if verbose:
+                ConsoleUI.print_step(3, "Генерация Excel файла...", "📊")
+
+            # Обеспечиваем правильное расширение
+            output_path = self._ensure_xlsx_extension(output_path)
+
+            # Создаем пустую книгу
+            wb = Workbook()
+
+            if verbose:
+                ConsoleUI.print_info(
+                    "Создание листа 'Краткий' (оранжевые заголовки)...", indent=1
+                )
+
+            # === ЛИСТ "КРАТКИЙ" ===
+            brief_ws = wb.active
+            brief_ws.title = "Краткий"
+
+            self._add_headers(brief_ws)
+            self._add_data_rows(brief_ws, brief_data)
+            self._apply_data_table_borders(brief_ws, len(brief_data))
+            self._add_summary_section_new_format(brief_ws, brief_data)
+            self._freeze_headers(brief_ws)
+            self._adjust_column_widths_auto(brief_ws, brief_data)
+
+            if verbose:
+                ConsoleUI.print_info(
+                    "Создание листа 'Полный' (зелёные заголовки, зебра-эффект)...",
+                    indent=1,
+                )
+
+            # === ЛИСТ "ПОЛНЫЙ" ===
+            detailed_ws = self.detailed_builder.create_detailed_worksheet(wb, "Полный")
+            self.create_detailed_report_sheet(detailed_ws, detailed_data)
+
+            # 🆕 v2.5.0: Добавление скрытого листа метаданных
+            if verbose:
+                ConsoleUI.print_info(
+                    "Добавление скрытого листа 'Метаданные'...", indent=1
+                )
+
+            self._create_metadata_sheet(wb, metrics)
+
+            # Сохраняем файл
+            wb.save(output_path)
+
+            if verbose:
+                ConsoleUI.print_success("Excel файл создан!")
+
+            # ========================================
+            # ЗАВЕРШЕНИЕ
+            # ========================================
+            elapsed_time = time.time() - start_time
+
+            self.logger.info(f"✅ Двухлистовой Excel отчет создан: {output_path}")
+            self.logger.info(f"⏱️ Время генерации: {format_duration(elapsed_time)}")
+
+            if verbose:
+                ConsoleUI.print_section_separator()
+                ConsoleUI.print_stats_box(
+                    "ИТОГОВАЯ СТАТИСТИКА",
+                    {
+                        "Краткий отчёт (валидность)": metrics.brief_success_rate,
+                        "Полный отчёт (валидность)": metrics.detailed_success_rate,
+                        "Счетов обработано": len(brief_data),
+                        "Товаров обработано": len(detailed_data),
+                        "Проблем обнаружено": metrics.total_issues,
+                    },
+                )
+                ConsoleUI.print_completion_banner(output_path)
+
+            # Возврат результата
+            if return_metrics:
+                return ComprehensiveReportResult(
+                    output_path=output_path, quality_metrics=metrics
+                )
+            else:
+                # Обратная совместимость
+                return output_path
+
         except Exception as e:
+            if verbose:
+                ConsoleUI.print_error(f"Ошибка генерации: {e}")
             self.logger.error(f"❌ Ошибка генерации комплексного отчета: {e}")
             raise
 
@@ -729,30 +999,30 @@ class ExcelReportBuilder:
     def _safe_sum_numeric(self, values, key=None):
         """
         Безопасное суммирование значений, игнорируя нечисловые.
-        
-        🔧 ИСПРАВЛЕНИЕ БАГ-4: Решает проблему суммирования когда vat_amount 
+
+        🔧 ИСПРАВЛЕНИЕ БАГ-4: Решает проблему суммирования когда vat_amount
         может быть строкой "нет" вместо числа.
-        
+
         Args:
             values: Список значений или записей
             key: Функция для извлечения значения (если values - записи)
-        
+
         Returns:
             Decimal: Сумма числовых значений
-        
+
         Examples:
             >>> _safe_sum_numeric([1, 2, "нет", 3])  # 6
             >>> _safe_sum_numeric(records, key=lambda r: r['vat_amount'])
         """
-        total = Decimal('0')
+        total = Decimal("0")
         for item in values:
             value = key(item) if key else item
-            
+
             # Проверяем что значение числовое
             if isinstance(value, (int, float, Decimal)):
                 total += Decimal(str(value))
             # Иначе (строка, None и т.д.) - пропускаем
-        
+
         return float(total)  # Возвращаем float для совместимости
 
     def build_invoice_report(
@@ -795,8 +1065,10 @@ class ExcelReportBuilder:
             # Calculate basic summary statistics
             # 🔧 ИСПРАВЛЕНИЕ БАГ-4: Используем _safe_sum_numeric для vat_amount
             total_amount = sum(record.get("amount", 0) for record in invoices)
-            total_vat = self._safe_sum_numeric(invoices, key=lambda r: r.get("vat_amount", 0))
-            
+            total_vat = self._safe_sum_numeric(
+                invoices, key=lambda r: r.get("vat_amount", 0)
+            )
+
             summary = {
                 "record_count": len(invoices),
                 "total_without_vat": total_amount,

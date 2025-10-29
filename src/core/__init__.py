@@ -4,12 +4,7 @@
 Содержит главное приложение, обработчик ошибок и оркестратор workflow.
 """
 
-from .app import (
-    ReportGeneratorApp,
-    AppFactory,
-    AppStatus,
-    main
-)
+from .app import ReportGeneratorApp, AppFactory, AppStatus, main
 
 from .error_handler import (
     ErrorHandler,
@@ -20,7 +15,7 @@ from .error_handler import (
     get_error_handler,
     handle_error,
     get_error_summary,
-    generate_error_report
+    generate_error_report,
 )
 
 from .workflow import (
@@ -28,31 +23,27 @@ from .workflow import (
     WorkflowResult,
     WorkflowProgress,
     WorkflowStages,
-    ProgressTracker
 )
 
 __all__ = [
     # App
-    'ReportGeneratorApp',
-    'AppFactory',
-    'AppStatus',
-    'main',
-    
+    "ReportGeneratorApp",
+    "AppFactory",
+    "AppStatus",
+    "main",
     # Error Handler
-    'ErrorHandler',
-    'ErrorReporter',
-    'ErrorContext',
-    'ErrorCategories',
-    'ErrorSeverity',
-    'get_error_handler',
-    'handle_error',
-    'get_error_summary',
-    'generate_error_report',
-    
+    "ErrorHandler",
+    "ErrorReporter",
+    "ErrorContext",
+    "ErrorCategories",
+    "ErrorSeverity",
+    "get_error_handler",
+    "handle_error",
+    "get_error_summary",
+    "generate_error_report",
     # Workflow
-    'WorkflowOrchestrator',
-    'WorkflowResult',
-    'WorkflowProgress',
-    'WorkflowStages',
-    'ProgressTracker'
-] 
+    "WorkflowOrchestrator",
+    "WorkflowResult",
+    "WorkflowProgress",
+    "WorkflowStages",
+]

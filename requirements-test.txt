@@ -10,7 +10,11 @@
 # Pytest - основной фреймворк для тестирования
 pytest>=8.4.1
 
-# Pytest-cov - измерение покрытия кода тестами
+# Coverage - измерение покрытия кода (БАГ-3 FIX)
+# [toml] поддерживает конфигурацию через pyproject.toml/pytest.ini
+coverage[toml]>=7.6.0
+
+# Pytest-cov - интеграция coverage с pytest
 pytest-cov>=6.0.0
 
 # Pytest-qt - тестирование Qt приложений (если используется GUI)

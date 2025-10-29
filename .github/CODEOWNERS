@@ -1,0 +1,42 @@
+# Code Owners for ReportB24
+# These owners will be automatically requested for review when someone opens a pull request
+
+# Global owners - review everything by default
+* @bivlked
+
+# Documentation
+/docs/ @bivlked
+/README.md @bivlked
+/README_EN.md @bivlked
+*.md @bivlked
+
+# Core source code
+/src/ @bivlked
+/src/bitrix24_client/ @bivlked
+/src/data_processor/ @bivlked
+/src/excel_generator/ @bivlked
+/src/config/ @bivlked
+/src/core/ @bivlked
+
+# Tests
+/tests/ @bivlked
+pytest.ini @bivlked
+
+# Configuration
+/config.ini.example @bivlked
+/.env-example @bivlked
+/requirements*.txt @bivlked
+
+# Scripts
+/scripts/ @bivlked
+
+# GitHub workflows and configuration
+/.github/ @bivlked
+
+# Security and dependencies
+/SECURITY.md @bivlked
+/DEPENDENCIES.md @bivlked
+
+# Architectural decisions
+/ARCHITECTURE.md @bivlked
+/docs/technical/architecture.md @bivlked

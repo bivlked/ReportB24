@@ -1,0 +1,71 @@
+name: ❓ Question
+description: Задать вопрос о ReportB24
+title: "[QUESTION]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Есть вопрос? Мы рады помочь! Пожалуйста, заполните форму ниже.
+        
+        **Примечание**: Для общих обсуждений используйте [GitHub Discussions](https://github.com/bivlked/ReportB24/discussions)
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Ваш вопрос
+      description: Четко сформулируйте ваш вопрос
+      placeholder: Как мне...?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Контекст
+      description: Дополнительная информация о вашей ситуации
+      placeholder: Я пытаюсь сделать X, но...
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: Что вы уже пробовали
+      description: Какие шаги вы уже предприняли?
+      placeholder: Я попробовал...
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия ReportB24
+      placeholder: "v2.5.0"
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Область вопроса
+      description: К какой области относится ваш вопрос?
+      options:
+        - Установка и настройка
+        - Использование API
+        - Генерация отчетов
+        - Конфигурация
+        - Безопасность
+        - Производительность
+        - Интеграция
+        - Другое
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Подтверждение
+      options:
+        - label: Я проверил документацию (docs/)
+          required: true
+        - label: Я проверил FAQ
+          required: true
+        - label: Я проверил существующие issues
+          required: true

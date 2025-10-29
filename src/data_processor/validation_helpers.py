@@ -16,22 +16,22 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def safe_decimal(value: Any, default: str = '0') -> Decimal:
+def safe_decimal(value: Any, default: str = "0") -> Decimal:
     """
     Безопасное преобразование значения в Decimal с валидацией.
-    
+
     Обрабатывает:
     - None → default
     - Пустые строки → default
     - Невалидные значения → default с warning
-    
+
     Args:
         value: Значение для преобразования (может быть None, str, int, float, Decimal)
         default: Значение по умолчанию при ошибке (строка)
-        
+
     Returns:
         Decimal: Безопасно преобразованное значение
-        
+
     Examples:
         >>> safe_decimal(None, '0')
         Decimal('0')
@@ -45,13 +45,13 @@ def safe_decimal(value: Any, default: str = '0') -> Decimal:
         Decimal('0')
     """
     # None или пустая строка
-    if value is None or value == '':
+    if value is None or value == "":
         return Decimal(default)
-    
+
     # Уже Decimal - возвращаем как есть
     if isinstance(value, Decimal):
         return value
-    
+
     # Пытаемся преобразовать
     try:
         # Очищаем от пробелов если строка
@@ -59,7 +59,7 @@ def safe_decimal(value: Any, default: str = '0') -> Decimal:
             value = value.strip()
             if not value:  # После strip пустая строка
                 return Decimal(default)
-        
+
         return Decimal(str(value))
     except (ValueError, TypeError, InvalidOperation) as e:
         logger.warning(
@@ -72,19 +72,19 @@ def safe_decimal(value: Any, default: str = '0') -> Decimal:
 def safe_float(value: Any, default: float = 0.0) -> float:
     """
     Безопасное преобразование значения в float с валидацией.
-    
+
     Обрабатывает:
     - None → default
     - Пустые строки → default
     - Невалидные значения → default с warning
-    
+
     Args:
         value: Значение для преобразования (может быть None, str, int, float, Decimal)
         default: Значение по умолчанию при ошибке
-        
+
     Returns:
         float: Безопасно преобразованное значение
-        
+
     Examples:
         >>> safe_float(None, 0.0)
         0.0
@@ -98,17 +98,17 @@ def safe_float(value: Any, default: float = 0.0) -> float:
         0.0
     """
     # None или пустая строка
-    if value is None or value == '':
+    if value is None or value == "":
         return default
-    
+
     # Уже float - возвращаем как есть
     if isinstance(value, float):
         return value
-    
+
     # Decimal - конвертируем
     if isinstance(value, Decimal):
         return float(value)
-    
+
     # Пытаемся преобразовать
     try:
         # Очищаем от пробелов если строка
@@ -116,7 +116,7 @@ def safe_float(value: Any, default: float = 0.0) -> float:
             value = value.strip()
             if not value:  # После strip пустая строка
                 return default
-        
+
         return float(value)
     except (ValueError, TypeError) as e:
         logger.warning(

@@ -96,7 +96,7 @@ class SystemValidator:
         required_packages = {
             "requests": "2.31.0",
             "openpyxl": "3.1.2",
-            "pytest": "8.4.0",
+            "dotenv": "1.0.0",  # python-dotenv package
         }
 
         for package, min_version in required_packages.items():

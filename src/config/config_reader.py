@@ -354,14 +354,22 @@ class SecureConfigReader(ConfigReader):
         """
         # Формируем возможные имена переменных окружения
         env_variants = [
-            f"{section.upper()}_{key.upper()}",
-            key.upper(),
+            f"{section.upper()}_{key.upper()}",  # BITRIXAPI_WEBHOOKURL
+            key.upper(),  # WEBHOOKURL
             (
-                f"BITRIX24_{key.upper()}"
+                f"BITRIX24_{key.upper()}"  # BITRIX24_WEBHOOKURL
                 if section.lower() == "bitrixapi"
                 else f"{section.upper()}_{key.upper()}"
             ),
         ]
+        
+        # Для webhookurl добавляем дополнительные варианты для обратной совместимости
+        if key.lower() == "webhookurl" and section.lower() == "bitrixapi":
+            env_variants.extend([
+                "BITRIXAPI_WEBHOOK_URL",  # Старый формат (с подчеркиванием)
+                "BITRIX24_WEBHOOK_URL",   # Альтернативный формат
+                "BITRIX_WEBHOOK_URL",     # Частая ошибка
+            ])
 
         # 1. Приоритет: переменные окружения
         for env_key in env_variants:

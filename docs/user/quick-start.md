@@ -59,10 +59,15 @@ cp config.ini.example config.ini
 
 ```env
 # .env
-BITRIX_WEBHOOK_URL=https://ваш-портал.bitrix24.ru/rest/12/abc123def456/
+BITRIX24_WEBHOOKURL=https://ваш-портал.bitrix24.ru/rest/12/abc123def456/
 ```
 
 ⚠️ **Важно**: Замените URL на ваш реальный webhook
+
+**Примечание**: Поддерживаются разные форматы имени переменной:
+- `BITRIX24_WEBHOOKURL` (рекомендуется)
+- `BITRIXAPI_WEBHOOKURL`
+- `WEBHOOKURL`
 
 ### 2.4 Настройка периода (опционально)
 

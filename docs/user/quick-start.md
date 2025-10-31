@@ -98,7 +98,7 @@ python scripts/run_report.py
 ### Детальный отчет с товарами
 
 ```bash
-python scripts/run_detailed_report.py
+python scripts/run_report.py
 ```
 
 **Результат**:

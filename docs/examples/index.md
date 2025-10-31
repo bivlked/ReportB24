@@ -23,7 +23,7 @@ python scripts/run_report.py
 
 ```python
 # Детальный отчет
-python scripts/run_detailed_report.py
+python scripts/run_report.py
 ```
 
 ---

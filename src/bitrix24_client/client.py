@@ -534,15 +534,12 @@ class Bitrix24Client:
         """Context manager exit"""
         self.close()
 
-    @retry_on_api_error(
-        max_retries=3, backoff_factor=1.0, retryable_codes=(429, 500, 502, 503, 504)
-    )
     def call(self, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         """
-        Универсальный метод вызова Bitrix24 API с автоматическим retry
+        Универсальный метод вызова Bitrix24 API с встроенным retry
 
-        🔥 НОВОЕ (v2.1.2): Упрощенный API wrapper с retry логикой для
-        прямых вызовов методов Bitrix24 (например, crm.company.get)
+        Retry логика обрабатывается внутри _make_request() с exponential backoff.
+        Для прямых вызовов методов Bitrix24 (например, crm.company.get)
 
         Args:
             method: Имя метода API (например, 'crm.company.get')

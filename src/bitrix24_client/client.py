@@ -213,6 +213,10 @@ class Bitrix24Client:
         result_data = json_data.get("result", json_data)
         total = json_data.get("total")
         next_item = json_data.get("next")
+        
+        # Problem 11 FIX: для crm.item.list значение next находится внутри result
+        if next_item is None and isinstance(result_data, dict):
+            next_item = result_data.get("next")
 
         return APIResponse(
             data=result_data,
@@ -461,10 +465,13 @@ class Bitrix24Client:
             tuple: (название_компании, ИНН)
         """
         try:
-            # 1. Ищем счёт по номеру (accountNumber)
-            params = {"filter[accountNumber]": invoice_number, "entityTypeId": 31}
+            # 1. Ищем счёт по номеру (accountNumber) - используем POST для надежности
+            data = {
+                "entityTypeId": 31,
+                "filter": {"accountNumber": invoice_number}
+            }
 
-            response = self._make_request("GET", "crm.item.list", params=params)
+            response = self._make_request("POST", "crm.item.list", data=data)
 
             if not response.data or not response.data.get("items"):
                 return None, None
@@ -745,8 +752,17 @@ class Bitrix24Client:
 
             invoice_info = invoice_response.data["items"][0]
 
-            # 2. Получаем товары по счету
-            products = self.get_products_by_invoice(invoice_id)
+            # 2. Получаем товары по счету (с обработкой ошибок)
+            products_result = self.get_products_by_invoice(invoice_id)
+            products = products_result.get("products", [])  # Извлекаем список!
+            has_error = products_result.get("has_error", False)
+            
+            # Логируем ошибку если есть
+            if has_error:
+                error_msg = products_result.get("error_message", "Unknown error")
+                logger.warning(
+                    f"Failed to load products for invoice {invoice_id}: {error_msg}"
+                )
 
             # 3. Получаем реквизиты (если есть accountNumber)
             account_number = invoice_info.get("accountNumber")
@@ -759,15 +775,18 @@ class Bitrix24Client:
             # 4. Формируем детальную структуру
             detailed_data = {
                 "invoice": invoice_info,
-                "products": products,
+                "products": products,  # Теперь список, а не словарь!
                 "company_name": company_name,
                 "inn": inn,
-                "total_products": len(products),
+                "total_products": len(products),  # Корректный подсчет!
                 "account_number": account_number,
+                "has_error": has_error,  # Добавляем флаг ошибки
+                "error_message": products_result.get("error_message") if has_error else None,
             }
 
             logger.info(
-                f"Retrieved detailed data for invoice {invoice_id}: {len(products)} products"
+                f"Retrieved detailed data for invoice {invoice_id}: "
+                f"{len(products)} products{' (with errors)' if has_error else ''}"
             )
             return detailed_data
 

@@ -233,33 +233,22 @@ graph LR
 
 ## 📦 Примеры использования
 
-### Базовый отчет
+### Генерация отчёта
 
 ```python
-from src.core.app import create_app
+from src.core.app import AppFactory
 
 # Создание приложения
-app = create_app('config.ini')
-
-# Генерация отчета
-report_path = app.generate_basic_report()
-print(f"Отчет создан: {report_path}")
+with AppFactory.create_app('config.ini') as app:
+    # Генерация комплексного отчёта (dual-sheet)
+    success = app.generate_report()
+    if success:
+        print("Отчёт успешно создан!")
 ```
 
-### Детальный отчет с товарами
+> 💡 **Примечание**: Начиная с v3.1.0, `generate_report()` всегда создаёт comprehensive отчёт с двумя листами
 
-```python
-from src.core.app import create_app
-
-# Создание приложения
-app = create_app('config.ini')
-
-# Генерация детального отчета
-report_path = app.generate_detailed_report()
-print(f"Детальный отчет создан: {report_path}")
-```
-
-[→ Больше примеров](docs/examples/)
+[📖 Больше примеров](docs/examples/)
 
 ## 🤝 Вклад в проект
 

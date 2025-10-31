@@ -262,28 +262,54 @@ class DataQualityValidator:
                 )
                 has_issues = True
 
-            # Проверка количества
+            # Проверка количества (Problem 13 FIX: обработка строк)
             quantity = record.get("quantity")
-            if quantity is None or quantity <= 0:
+            try:
+                # Конвертируем в float если строка
+                quantity_num = float(quantity) if isinstance(quantity, str) else quantity
+                if quantity_num is None or quantity_num <= 0:
+                    issues.append(
+                        ValidationIssue(
+                            record_id=record_id,
+                            field="quantity",
+                            issue_type="invalid",
+                            message=f"Некорректное количество: {quantity}",
+                        )
+                    )
+                    has_issues = True
+            except (ValueError, TypeError):
                 issues.append(
                     ValidationIssue(
                         record_id=record_id,
                         field="quantity",
                         issue_type="invalid",
-                        message=f"Некорректное количество: {quantity}",
+                        message=f"Невозможно преобразовать количество: {quantity}",
                     )
                 )
                 has_issues = True
 
-            # Проверка цены
+            # Проверка цены (Problem 13 FIX: обработка строк)
             price = record.get("price")
-            if price is None or price < 0:
+            try:
+                # Конвертируем в float если строка
+                price_num = float(price) if isinstance(price, str) else price
+                if price_num is None or price_num < 0:
+                    issues.append(
+                        ValidationIssue(
+                            record_id=record_id,
+                            field="price",
+                            issue_type="invalid",
+                            message=f"Некорректная цена: {price}",
+                        )
+                    )
+                    has_issues = True
+            except (ValueError, TypeError):
                 issues.append(
                     ValidationIssue(
                         record_id=record_id,
                         field="price",
                         issue_type="invalid",
-                        message=f"Некорректная цена: {price}",
+                        message=f"Невозможно преобразовать цену: {price}",
                     )
                 )
                 has_issues = True

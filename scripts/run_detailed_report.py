@@ -107,6 +107,8 @@ def main():
                 ConsoleUI.print_info("Загрузка товаров по счетам...", indent=1)
                 detailed_data = []
                 total_products = 0
+                failed_invoices = []  # Список счетов с ошибками
+                success_count = 0
 
                 for i, invoice in enumerate(invoices, 1):
                     invoice_id = invoice.get("id")
@@ -123,10 +125,24 @@ def main():
                             suffix=f"{Colors.DIM}(счёт {i}/{len(invoices)}){Colors.RESET}",
                         )
 
-                    # 🔧 БАГ-9 FIX: get_products_by_invoice теперь возвращает Dict
+                    # 🔧 БАГ-9 FIX + Problem 1 FIX: Проверяем флаг has_error
                     products_result = bitrix_client.get_products_by_invoice(invoice_id)
+                    
+                    # Проверка на ошибку загрузки товаров
+                    if products_result.get("has_error"):
+                        error_msg = products_result.get("error_message", "Unknown error")
+                        logger.warning(f"Invoice {invoice_id}: {error_msg}")
+                        failed_invoices.append({
+                            "id": invoice_id,
+                            "account_number": invoice.get("accountNumber", f"Счет #{invoice_id}"),
+                            "error": error_msg
+                        })
+                        continue  # Пропускаем этот счёт
+                    
+                    # Извлекаем список товаров
                     products = products_result.get("products", [])
                     total_products += len(products)
+                    success_count += 1
 
                     account_number = invoice.get("accountNumber", f"Счет #{invoice_id}")
                     company_name, inn = (
@@ -155,7 +171,24 @@ def main():
                     )
                     detailed_data.extend(invoice_products)
 
-                ConsoleUI.print_success(f"Обработано товаров: {len(detailed_data)}")
+                # Summary обработки с информацией об ошибках
+                ConsoleUI.print_success(
+                    f"Обработано: {success_count}/{len(invoices)} счетов, "
+                    f"{total_products} товаров"
+                )
+                
+                if failed_invoices:
+                    ConsoleUI.print_section_separator()
+                    ConsoleUI.print_warning(f"⚠️  {len(failed_invoices)} счетов имели ошибки:")
+                    for failed in failed_invoices:
+                        ConsoleUI.print_info(
+                            f"  • {failed['account_number']}: {failed['error']}", 
+                            indent=1
+                        )
+                    ConsoleUI.print_info(
+                        "\n💡 Совет: Проверьте сетевое подключение и статус Bitrix24 API", 
+                        indent=1
+                    )
 
                 # Обработка счетов для краткого отчета
                 spinner = Spinner("Формирование краткого отчета")

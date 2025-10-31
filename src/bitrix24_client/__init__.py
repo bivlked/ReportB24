@@ -12,7 +12,6 @@ Bitrix24 API Client Module
 
 from .client import Bitrix24Client
 from .rate_limiter import AdaptiveRateLimiter
-from .retry_decorator import retry_on_api_error, RetryExhaustedError
 from .exceptions import (
     Bitrix24APIError,
     RateLimitError,
@@ -30,9 +29,6 @@ __all__ = [
     "Bitrix24Client",
     # Rate limiting
     "AdaptiveRateLimiter",
-    # Retry decorator (v2.1.2)
-    "retry_on_api_error",
-    "RetryExhaustedError",
     # Exceptions
     "Bitrix24APIError",
     "RateLimitError",

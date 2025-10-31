@@ -20,7 +20,6 @@ from .exceptions import (
     TimeoutError as APITimeoutError,
 )
 from .api_cache import get_cache
-from .retry_decorator import retry_on_api_error  # 🔥 НОВОЕ (v2.1.2)
 
 logger = logging.getLogger(__name__)
 

@@ -7,7 +7,7 @@
 
 1. Следуйте разделу «Быстрый старт (Windows)» в [README](../README.md) для базовой установки.
 2. Подготовьте `config.ini` и `.env`, указав рабочий период и webhook Bitrix24.
-3. Запустите `py run_detailed_report.py`, чтобы получить двухлистовой отчёт в папке `reports/`.
+3. Запустите `py run_report.py`, чтобы получить двухлистовой отчёт в папке `reports/`.
 4. Используйте сценарии из этого документа для расширенных задач.
 
 <a id="работа-с-фильтрами-и-периодами"></a>
@@ -17,7 +17,7 @@
 
 - `config.ini` → секция `[ReportPeriod]` управляет диапазоном дат.
 - Формат дат: `дд.мм.гггг`.
-- После редактирования перезапустите `run_detailed_report.py` для применения изменений.
+- После редактирования перезапустите `run_report.py` для применения изменений.
 
 ### Программное изменение периода
 
@@ -78,7 +78,7 @@ with AppFactory.create_app('config.ini') as app:
 
 1. Откройте «Планировщик заданий» → «Создать задачу».
 2. Укажите триггер (например, ежедневный запуск в 07:00).
-3. В действиях добавьте: `Program/script: py`, `Add arguments: run_detailed_report.py`, `Start in: C:\Projects\ReportB24`.
+3. В действиях добавьте: `Program/script: py`, `Add arguments: run_report.py`, `Start in: C:\Projects\ReportB24`.
 4. Включите «Запускать только при подключении к сети», чтобы избежать сбоев Bitrix24.
 
 ### GitHub Actions (self-hosted)
@@ -105,7 +105,7 @@ jobs:
       - name: Generate report
         env:
           BITRIX_WEBHOOK_URL: ${{ secrets.BITRIX_WEBHOOK_URL }}
-        run: python run_detailed_report.py
+        run: python run_report.py
 ```
 
 ### Docker-контейнер
@@ -115,7 +115,7 @@ FROM python:3.11-slim
 WORKDIR /app
 COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
-CMD ["python", "run_detailed_report.py"]
+CMD ["python", "run_report.py"]
 ```
 
 <a id="проверка-результата"></a>
@@ -131,7 +131,7 @@ CMD ["python", "run_detailed_report.py"]
 Редактируйте `defaultsavefolder` в `config.ini` и убедитесь, что папка существует.
 
 **Можно ли использовать macOS или Linux?**  
-Да. Создайте окружение командой `python3 -m venv .venv` и запускайте `python3 run_detailed_report.py`.
+Да. Создайте окружение командой `python3 -m venv .venv` и запускайте `python3 run_report.py`.
 
 **Как включить подробные логи?**  
 Установите `loglevel = DEBUG` в секции `[AppSettings]` файла `config.ini`.

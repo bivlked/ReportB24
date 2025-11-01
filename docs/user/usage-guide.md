@@ -79,7 +79,7 @@ python scripts/run_report.py
 **Использование скрипта**:
 
 ```bash
-python scripts/run_detailed_report.py
+python scripts/run_report.py
 ```
 
 **Что создается**:

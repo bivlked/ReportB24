@@ -83,7 +83,7 @@ export BITRIX_WEBHOOK_URL="your_webhook_url"
 python scripts/run_report.py
 
 # Детальный
-python scripts/run_detailed_report.py
+python scripts/run_report.py
 ```
 
 ### Q: Какой максимальный период отчета?
@@ -120,7 +120,7 @@ filtered = [inv for inv in invoices if inv.get('company_inn') == '1234567890']
 **A**: Проверьте:
 
 1. **Права webhook**: Должно быть `smart_invoice`
-2. **API метод**: Используете `run_detailed_report.py`?
+2. **API метод**: Используете `run_report.py`?
 3. **Товары в Bitrix24**: Есть ли товары у счетов?
 
 ```bash

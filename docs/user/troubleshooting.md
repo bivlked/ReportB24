@@ -563,7 +563,7 @@ move C:\Пользователи\Иван\Проекты\ReportB24 C:\Projects\R
 ```bash
 # Дайте права на выполнение
 chmod +x scripts/run_report.py
-chmod +x scripts/run_detailed_report.py
+chmod +x scripts/run_report.py
 
 # Или запускайте через python
 python scripts/run_report.py

@@ -1,0 +1,586 @@
+Found 93 .md files
+
+Checking links...
+================================================================================
+[BROKEN] ARCHITECTURE.md
+  Link text: key
+  Target: return data[key]
+
+[BROKEN] CONTRIBUTING.md
+  Link text: Create Bug Report
+  Target: ../../issues/new?template=bug_report.md
+
+[BROKEN] CONTRIBUTING.md
+  Link text: Create Feature Request
+  Target: ../../issues/new?template=feature_request.md
+
+[BROKEN] CONTRIBUTING.md
+  Link text: str
+  Target: """Process invoice data and return Excel file path."""
+
+[BROKEN] CONTRIBUTING.md
+  Link text: optional scope
+  Target: <description>
+
+[BROKEN] CONTRIBUTING.md
+  Link text: creating an issue
+  Target: ../../issues/new
+
+[BROKEN] CONTRIBUTING.md
+  Link text: discussion
+  Target: ../../discussions
+
+[BROKEN] CONTRIBUTING.md
+  Link text: good first issues
+  Target: ../../issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22
+
+[BROKEN] cursor-memory-bank\MEMORY_BANK_OPTIMIZATIONS.md
+  Link text: .cursor/rules/isolation_rules/Core/hierarchical-rule-loading.mdc
+  Target: /.cursor/rules/isolation_rules/Core/hierarchical-rule-loading.mdc
+
+[BROKEN] cursor-memory-bank\MEMORY_BANK_OPTIMIZATIONS.md
+  Link text: .cursor/rules/isolation_rules/Phases/CreativePhase/optimized-creative-template.mdc
+  Target: /.cursor/rules/isolation_rules/Phases/CreativePhase/optimized-creative-template.mdc
+
+[BROKEN] cursor-memory-bank\MEMORY_BANK_OPTIMIZATIONS.md
+  Link text: .cursor/rules/isolation_rules/Core/mode-transition-optimization.mdc
+  Target: /.cursor/rules/isolation_rules/Core/mode-transition-optimization.mdc
+
+[BROKEN] cursor-memory-bank\MEMORY_BANK_OPTIMIZATIONS.md
+  Link text: .cursor/rules/isolation_rules/Level1/optimized-workflow-level1.mdc
+  Target: /.cursor/rules/isolation_rules/Level1/optimized-workflow-level1.mdc
+
+[BROKEN] cursor-memory-bank\MEMORY_BANK_OPTIMIZATIONS.md
+  Link text: .cursor/rules/isolation_rules/Core/optimization-integration.mdc
+  Target: /.cursor/rules/isolation_rules/Core/optimization-integration.mdc
+
+[BROKEN] cursor-memory-bank\MEMORY_BANK_OPTIMIZATIONS.md
+  Link text: /.cursor/rules/isolation_rules/main-optimized.mdc
+  Target: /.cursor/rules/isolation_rules/main-optimized.mdc
+
+[BROKEN] cursor-memory-bank\MEMORY_BANK_OPTIMIZATIONS.md
+  Link text: /.cursor/rules/isolation_rules/Core/hierarchical-rule-loading.mdc
+  Target: /.cursor/rules/isolation_rules/Core/hierarchical-rule-loading.mdc
+
+[BROKEN] cursor-memory-bank\MEMORY_BANK_OPTIMIZATIONS.md
+  Link text: /.cursor/rules/isolation_rules/Core/mode-transition-optimization.mdc
+  Target: /.cursor/rules/isolation_rules/Core/mode-transition-optimization.mdc
+
+[BROKEN] cursor-memory-bank\MEMORY_BANK_OPTIMIZATIONS.md
+  Link text: /.cursor/rules/isolation_rules/Core/optimization-integration.mdc
+  Target: /.cursor/rules/isolation_rules/Core/optimization-integration.mdc
+
+[BROKEN] cursor-memory-bank\MEMORY_BANK_OPTIMIZATIONS.md
+  Link text: /.cursor/rules/isolation_rules/Level1/optimized-workflow-level1.mdc
+  Target: /.cursor/rules/isolation_rules/Level1/optimized-workflow-level1.mdc
+
+[BROKEN] cursor-memory-bank\MEMORY_BANK_OPTIMIZATIONS.md
+  Link text: /.cursor/rules/isolation_rules/Phases/CreativePhase/optimized-creative-template.mdc
+  Target: /.cursor/rules/isolation_rules/Phases/CreativePhase/optimized-creative-template.mdc
+
+[BROKEN] cursor-memory-bank\memory_bank_upgrade_guide.md
+  Link text: Architectural Changes
+  Target: /path-to-diagram.png
+
+[BROKEN] docs\archive\enhancements\2025-07\remaining-fixes-and-docs-2025-07-03.md
+  Link text: memory-bank/reflection/reflection-remaining-fixes-2025-07-03.md
+  Target: ../../memory-bank/reflection/reflection-remaining-fixes-2025-07-03.md
+
+[BROKEN] docs\archive\enhancements\2025-07\remaining-fixes-and-docs-2025-07-03.md
+  Link text: memory-bank/tasks.md
+  Target: ../../memory-bank/tasks.md
+
+[BROKEN] docs\archive\enhancements\2025-07\remaining-fixes-and-docs-2025-07-03.md
+  Link text: memory-bank/progress.md
+  Target: ../../memory-bank/progress.md
+
+[BROKEN] docs\contributing\index.md
+  Link text: Getting Started
+  Target: getting-started.md
+
+[BROKEN] docs\contributing\index.md
+  Link text: Coding Standards
+  Target: coding-standards.md
+
+[BROKEN] docs\contributing\index.md
+  Link text: PR Process
+  Target: pr-process.md
+
+[BROKEN] docs\contributing\index.md
+  Link text: Release Process
+  Target: release-process.md
+
+[BROKEN] docs\contributing\index.md
+  Link text: Coding Standards
+  Target: coding-standards.md
+
+[BROKEN] docs\contributing\index.md
+  Link text: API Reference
+  Target: ../technical/api-reference.md
+
+[BROKEN] docs\contributing\index.md
+[ERROR] docs\contributing\index.md: 'charmap' codec can't encode character '\u2192' in position 29: character maps to <undefined>
+
+[BROKEN] docs\diagrams\index.md
+  Link text: System Overview
+  Target: system-overview.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: Architecture
+  Target: architecture.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: Workflow
+  Target: workflow.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: Data Flow
+  Target: data-flow.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: System Overview
+  Target: system-overview.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: Architecture
+  Target: architecture.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: Workflow
+  Target: workflow.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: Data Flow
+  Target: data-flow.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: API Reference
+  Target: ../technical/api-reference.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: System Overview
+  Target: system-overview.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: Architecture
+  Target: architecture.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: Workflow
+  Target: workflow.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: Data Flow
+  Target: data-flow.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: Data Flow
+  Target: data-flow.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: Workflow
+  Target: workflow.md
+
+[BROKEN] docs\diagrams\index.md
+  Link text: Architecture
+  Target: architecture.md
+
+[BROKEN] docs\diagrams\index.md
+[ERROR] docs\diagrams\index.md: 'charmap' codec can't encode character '\u2192' in position 29: character maps to <undefined>
+
+[BROKEN] docs\examples\index.md
+  Link text: Basic Report
+  Target: basic-report.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Detailed Report
+  Target: detailed-report.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Batch Processing
+  Target: batch-processing.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Custom Formatting
+  Target: custom-formatting.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Error Handling
+  Target: error-handling.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Integration
+  Target: integration.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Basic Report
+  Target: basic-report.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Detailed Report
+  Target: detailed-report.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Batch Processing
+  Target: batch-processing.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Custom Formatting
+  Target: custom-formatting.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Error Handling
+  Target: error-handling.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Integration
+  Target: integration.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Basic Report
+  Target: basic-report.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Detailed Report
+  Target: detailed-report.md
+
+[BROKEN] docs\examples\index.md
+  Link text: User Guide
+  Target: ../user/basic-usage.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Batch Processing
+  Target: batch-processing.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Custom Formatting
+  Target: custom-formatting.md
+
+[BROKEN] docs\examples\index.md
+  Link text: Integration
+  Target: integration.md
+
+[BROKEN] docs\examples\index.md
+  Link text: API Reference
+  Target: ../technical/api-reference.md
+
+[BROKEN] docs\examples\index.md
+[ERROR] docs\examples\index.md: 'charmap' codec can't encode character '\u2192' in position 26: character maps to <undefined>
+
+[BROKEN] docs\technical\api\index.md
+  Link text: Bitrix24Client
+  Target: bitrix24-client.md
+
+[BROKEN] docs\technical\api\index.md
+  Link text: DataProcessor
+  Target: data-processor.md
+
+[BROKEN] docs\technical\api\index.md
+  Link text: ExcelGenerator
+  Target: excel-generator.md
+
+[BROKEN] docs\technical\api\index.md
+  Link text: ConfigReader
+  Target: config-reader.md
+
+[BROKEN] docs\technical\api\index.md
+  Link text: Workflow
+  Target: workflow.md
+
+[BROKEN] docs\technical\api\index.md
+[ERROR] docs\technical\api\index.md: 'charmap' codec can't encode character '\u2192' in position 13: character maps to <undefined>
+
+[BROKEN] docs\technical\architecture.md
+  Link text: dict
+  Target: """Get Smart Invoices for period"""
+
+[BROKEN] docs\technical\architecture.md
+  Link text: str, List
+  Target: """Get products for multiple invoices (batch optimization)"""
+
+[BROKEN] docs\technical\architecture.md
+  Link text: ProductData
+  Target: """Process product rows"""
+
+[BROKEN] docs\technical\architecture.md
+  Link text: API Reference
+  Target: api-reference.md
+
+[BROKEN] docs\technical\architecture.md
+[ERROR] docs\technical\architecture.md: 'charmap' codec can't encode character '\u2192' in position 27: character maps to <undefined>
+
+[BROKEN] docs\technical\development.md
+  Link text: dict
+  Target: """
+
+[BROKEN] docs\technical\development.md
+  Link text: API Reference
+  Target: api-reference.md
+
+[BROKEN] docs\user\faq.md
+  Link text: API Reference
+  Target: ../technical/api-reference.md
+
+[BROKEN] docs\user\usage-guide.md
+  Link text: 1, 2, 3
+  Target: generate_monthly_report(2024, month)
+
+[BROKEN] docs\user\usage-guide.md
+  Link text: 'total_amount'
+  Target: ,.2f} Ёєс.")
+
+[BROKEN] docs\user\usage-guide.md
+  Link text: 'total_vat'
+  Target: ,.2f} Ёєс.")
+
+[BROKEN] docs\user\usage-guide.md
+  Link text: 'amount'
+  Target: ,.2f} Ёєс.")
+
+[BROKEN] docs\user\usage-guide.md
+  Link text: 'amount'
+  Target: ,.2f} Ёєс.")
+
+[BROKEN] memory-bank\creative\BATCH_CLARIFICATION.md
+  Link text: ProcessedInvoice
+  Target: """╬сЁрсрЄ√трхЄ ёяшёюъ ёўхЄют ┬ ╧└╠▀╥╚"""
+
+[BROKEN] memory-bank\creative\BATCH_CLARIFICATION.md
+  Link text: ProcessedInvoice
+  Target: """╬сЁрсрЄ√трхЄ batch ёўхЄют"""
+
+[BROKEN] memory-bank\creative\creative-bugfix-critical-errors-v1.0.0.md
+  Link text: Dict
+  Target: response = self._call_crm_item_list(
+
+[BROKEN] memory-bank\creative\creative-bugfix-critical-errors-v1.0.0.md
+  Link text: "has_error"
+  Target: assert "error_message" in result
+
+[BROKEN] memory-bank\creative\creative-company-cache-architecture.md
+  Link text: Dict
+  Target: """╧юыєўхэшх ЁхътшчшЄют ъюьярэшш"""
+
+[BROKEN] memory-bank\creative\creative-company-cache-architecture.md
+  Link text: str, Any
+  Target: """
+
+[BROKEN] memory-bank\creative\creative-company-cache-architecture.md
+  Link text: str, Any
+  Target: """╧юыєўхэшх фхЄры№эющ ёЄрЄшёЄшъш ъ¤°р"""
+
+[BROKEN] memory-bank\creative\creative-data-enrichment-strategy-v2.4.1.md
+  Link text: ProcessedInvoice
+  Target: """
+
+[BROKEN] memory-bank\creative\creative-data-enrichment-strategy-v2.4.1.md
+  Link text: ProcessedInvoice
+  Target: """╬сЁрсрЄ√трхЄ batch ё auto-cache."""
+
+[BROKEN] memory-bank\creative\creative-data-processing-architecture-v2.4.0.md
+  Link text: ProcessedInvoice
+  Target: """╬сЁрсрЄ√трхЄ batch ёўхЄют ё трышфрЎшхщ"""
+
+[BROKEN] memory-bank\creative\creative-data-processing-architecture-v2.4.0.md
+  Link text: str, Any
+  Target: """╩юэтхЁЄрЎш  т dict фы  яхЁхфрўш т Excel ухэхЁрЄюЁ"""
+
+[BROKEN] memory-bank\creative\creative-data-processing-architecture-v2.4.0.md
+  Link text: ProcessedInvoice
+  Target: """
+
+[BROKEN] memory-bank\creative\creative-data-processing-architecture-v2.4.0.md
+  Link text: ProcessedInvoice
+  Target: ╬сЁрсюЄрээ√х ёўхЄр ё ўшёыют√ьш Єшярьш
+
+[BROKEN] memory-bank\creative\creative-data-processing-architecture-v2.4.0.md
+  Link text: datetime
+  Target: """╧рЁёшэу фрЄ√ ё шёяюы№чютрэшхь DateProcessor"""
+
+[BROKEN] memory-bank\creative\creative-data-processing-architecture-v2.4.0.md
+  Link text: Dict
+  Target: ╬сЁрсюЄрээ√х фрээ√х фы  Excel ё ╫╚╤╦╬┬█╠╚ Єшярьш
+
+[BROKEN] memory-bank\creative\creative-detailed-report-architecture.md
+  Link text: str, dict
+  Target: """╧юёЄЁюхэшх batch чряЁюёр фы  ЄютрЁют"""
+
+[BROKEN] memory-bank\creative\creative-detailed-report-architecture.md
+  Link text: InvoiceWithProducts
+  Target: """
+
+[BROKEN] memory-bank\creative\creative-detailed-report-architecture.md
+  Link text: str, Any
+  Target: """╘юЁьрЄшЁютрэшх фрээ√ї ЄютрЁр фы  Excel ёЄЁюъш"""
+
+[BROKEN] memory-bank\creative\creative-docs-architecture-v3.0.0.md
+  Link text: docs/
+  Target: docs/
+
+[BROKEN] memory-bank\creative\creative-docs-architecture-v3.0.0.md
+  Link text: Installation Guide
+  Target: docs/user/installation.md
+
+[BROKEN] memory-bank\creative\creative-docs-architecture-v3.0.0.md
+  Link text: User Guide
+  Target: docs/user/
+
+[BROKEN] memory-bank\creative\creative-docs-architecture-v3.0.0.md
+  Link text: API Reference
+  Target: docs/technical/api-reference.md
+
+[BROKEN] memory-bank\creative\creative-docs-architecture-v3.0.0.md
+  Link text: Examples
+  Target: docs/examples/
+
+[BROKEN] memory-bank\creative\creative-docs-architecture-v3.0.0.md
+  Link text: SECURITY.md
+  Target: SECURITY.md
+
+[BROKEN] memory-bank\creative\creative-docs-architecture-v3.0.0.md
+  Link text: CONTRIBUTING.md
+  Target: CONTRIBUTING.md
+
+[BROKEN] memory-bank\creative\creative-docs-architecture-v3.0.0.md
+  Link text: LICENSE
+  Target: LICENSE
+
+[BROKEN] memory-bank\creative\creative-docs-architecture-v3.0.0.md
+[ERROR] memory-bank\creative\creative-docs-architecture-v3.0.0.md: 'charmap' codec can't encode character '\u2192' in position 29: character maps to <undefined>
+
+[BROKEN] memory-bank\creative\creative-report-enhancement-v2.5.0.md
+  Link text: '═х эрщфхэю', '╬°шсър'
+  Target: issues.append(ValidationIssue(
+
+[BROKEN] memory-bank\creative\creative-report-enhancement-v2.5.0.md
+  Link text: str, ComprehensiveReportResult
+  Target: """
+
+[BROKEN] memory-bank\creative\creative-vat-handling-v2.3.0.md
+  Link text: 'has_vat'
+  Target: cell.value = "эхЄ"
+
+[BROKEN] memory-bank\tasks.md
+  Link text: ![Python 3.8+
+  Target: badge
+
+[BROKEN] memory-bank\tasks.md
+  Link text: ![Tests
+  Target: badge
+
+[BROKEN] memory-bank\tasks.md
+  Link text: ![Coverage
+  Target: badge
+
+[BROKEN] memory-bank\tasks.md
+  Link text: ![License: MIT
+  Target: badge
+
+[BROKEN] memory-bank\tasks.md
+  Link text: ![Version
+  Target: badge
+
+[BROKEN] memory-bank\tasks.md
+  Link text: ![Security
+  Target: badge
+
+[BROKEN] memory-bank\tasks.md
+  Link text: ![Code style: black
+  Target: badge
+
+[BROKEN] README.md
+[ERROR] README.md: 'charmap' codec can't encode character '\U0001f4cb' in position 13: character maps to <undefined>
+
+[BROKEN] README_EN.md
+  Link text: Best Practices
+  Target: docs/SECURITY_BEST_PRACTICES.md
+
+[BROKEN] README_EN.md
+  Link text: docs/API.md
+  Target: docs/API.md
+
+[BROKEN] README_EN.md
+  Link text: docs/DEPLOYMENT.md
+  Target: docs/DEPLOYMENT.md
+
+[BROKEN] README_EN.md
+  Link text: docs/PERFORMANCE.md
+  Target: docs/PERFORMANCE.md
+
+[BROKEN] README_EN.md
+  Link text: docs/tutorials/QUICKSTART.md
+  Target: docs/tutorials/QUICKSTART.md
+
+[BROKEN] README_EN.md
+  Link text: docs/tutorials/ADVANCED.md
+  Target: docs/tutorials/ADVANCED.md
+
+[BROKEN] README_EN.md
+  Link text: docs/faq/FAQ.md
+  Target: docs/faq/FAQ.md
+
+[BROKEN] README_EN.md
+  Link text: FAQ
+  Target: docs/faq/FAQ.md
+
+================================================================================
+
+Summary:
+Total files checked: 93
+Total links found: 730
+Broken internal links: 132
+
+[WARNING] Found broken links!
+
+Broken links by file:
+
+ARCHITECTURE.md:
+  - [key](return data[key])
+
+CONTRIBUTING.md:
+  - [Create Bug Report](../../issues/new?template=bug_report.md)
+  - [Create Feature Request](../../issues/new?template=feature_request.md)
+  - [str]("""Process invoice data and return Excel file path.""")
+  - [optional scope](<description>)
+  - [creating an issue](../../issues/new)
+  - [discussion](../../discussions)
+  - [good first issues](../../issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+
+cursor-memory-bank\MEMORY_BANK_OPTIMIZATIONS.md:
+  - [.cursor/rules/isolation_rules/Core/hierarchical-rule-loading.mdc](/.cursor/rules/isolation_rules/Core/hierarchical-rule-loading.mdc)
+  - [.cursor/rules/isolation_rules/Phases/CreativePhase/optimized-creative-template.mdc](/.cursor/rules/isolation_rules/Phases/CreativePhase/optimized-creative-template.mdc)
+  - [.cursor/rules/isolation_rules/Core/mode-transition-optimization.mdc](/.cursor/rules/isolation_rules/Core/mode-transition-optimization.mdc)
+  - [.cursor/rules/isolation_rules/Level1/optimized-workflow-level1.mdc](/.cursor/rules/isolation_rules/Level1/optimized-workflow-level1.mdc)
+  - [.cursor/rules/isolation_rules/Core/optimization-integration.mdc](/.cursor/rules/isolation_rules/Core/optimization-integration.mdc)
+  - [/.cursor/rules/isolation_rules/main-optimized.mdc](/.cursor/rules/isolation_rules/main-optimized.mdc)
+  - [/.cursor/rules/isolation_rules/Core/hierarchical-rule-loading.mdc](/.cursor/rules/isolation_rules/Core/hierarchical-rule-loading.mdc)
+  - [/.cursor/rules/isolation_rules/Core/mode-transition-optimization.mdc](/.cursor/rules/isolation_rules/Core/mode-transition-optimization.mdc)
+  - [/.cursor/rules/isolation_rules/Core/optimization-integration.mdc](/.cursor/rules/isolation_rules/Core/optimization-integration.mdc)
+  - [/.cursor/rules/isolation_rules/Level1/optimized-workflow-level1.mdc](/.cursor/rules/isolation_rules/Level1/optimized-workflow-level1.mdc)
+  - [/.cursor/rules/isolation_rules/Phases/CreativePhase/optimized-creative-template.mdc](/.cursor/rules/isolation_rules/Phases/CreativePhase/optimized-creative-template.mdc)
+
+cursor-memory-bank\memory_bank_upgrade_guide.md:
+  - [Architectural Changes](/path-to-diagram.png)
+
+docs\archive\enhancements\2025-07\remaining-fixes-and-docs-2025-07-03.md:
+  - [memory-bank/reflection/reflection-remaining-fixes-2025-07-03.md](../../memory-bank/reflection/reflection-remaining-fixes-2025-07-03.md)
+  - [memory-bank/tasks.md](../../memory-bank/tasks.md)
+  - [memory-bank/progress.md](../../memory-bank/progress.md)
+
+docs\contributing\index.md:
+  - [Getting Started](getting-started.md)
+  - [Coding Standards](coding-standards.md)
+  - [PR Process](pr-process.md)
+  - [Release Process](release-process.md)
+  - [Coding Standards](coding-standards.md)
+  - [API Reference](../technical/api-reference.md)
+Traceback (most recent call last):
+  File "D:\CursorProgs\ReportB24\check_links.py", line 103, in <module>
+    success = main()
+              ^^^^^^
+  File "D:\CursorProgs\ReportB24\check_links.py", line 96, in main
+    print(f"  - [{text}]({link})")
+  File "C:\Users\biv\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1251.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 21: character maps to <undefined>

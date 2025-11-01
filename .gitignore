@@ -40,6 +40,7 @@ logs/
 # Конфиденциальные данные
 .env
 *.key
+config.ini
 config_local.ini
 
 # OS файлы
@@ -71,7 +72,10 @@ final_*.py
 *.gif
 *.bmp
 
-# Memory Bank временные файлы (используем только memory-bank/)
+# Memory Bank (внутренняя документация разработки - только локально)
+memory-bank/
+cursor-memory-bank
+tasks.md
 activeContext.md
 progress.md  
 projectbrief.md
